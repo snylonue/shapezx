@@ -13,6 +13,10 @@ using std::size_t;
 using std::unique_ptr;
 using std::vector;
 
+struct Context {
+  int data;
+};
+
 struct Chunk {
   optional<Ore> ore;
   optional<unique_ptr<Building>> building;
