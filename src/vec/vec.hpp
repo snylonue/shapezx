@@ -1,3 +1,6 @@
+#ifndef SHAPEZX_VEC_VEC_HPP
+#define SHAPEZX_VEC_VEC_HPP
+
 #include <concepts>
 
 namespace shapezx::vec {
@@ -51,3 +54,5 @@ template <Arithmetic T> struct Vec2 {
   }
 };
 } // namespace shapezx::vec
+
+#endif
