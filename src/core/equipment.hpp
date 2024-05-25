@@ -1,3 +1,9 @@
+#ifndef SHAPEZX_CORE_EQUIPMENT
+#define SHAPEZX_CORE_EQUIPMENT
+
+#include "../vec/vec.hpp"
+#include "ore.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -18,8 +24,6 @@ using std::vector;
 
 constexpr int64_t BASIC_EFF = 10;
 
-class Context;
-
 enum class BuildingType {
   Miner,
   Belt,
@@ -33,12 +37,22 @@ enum class Direction {
   Down,
   Left,
   Right,
-  None,
 };
 
 template <typename Item> struct Buffer {
   Item item;
   size_t num;
+
+  Buffer() : num(0) {}
+
+  void clear() { this->num = 0; }
+
+  Buffer take() {
+    auto ret = Buffer(*this);
+    this->clear();
+
+    return ret;
+  }
 };
 
 struct BuildingInfo {
@@ -48,15 +62,27 @@ struct BuildingInfo {
   Direction direction;
 };
 
+struct MapAccessor;
+
 struct Building {
   virtual BuildingInfo info() const = 0;
   virtual unique_ptr<Building> clone() const = 0;
+
+  virtual vector<vec::Vec2<size_t>> input_positions(MapAccessor&) const { return {}; }
+  virtual vector<vec::Vec2<size_t>> output_positions(MapAccessor&) const { return {}; }
+
+  virtual void input(Buffer<Ore>){};
+  virtual Buffer<Ore> output() { return Buffer<Ore>(); };
+
+  // update internal state by 1 tick
+  virtual void update(MapAccessor);
 
   virtual ~Building() = 0;
 };
 
 struct Miner final : public Building {
   BuildingInfo info_;
+  Buffer<Ore> ores;
 
   explicit Miner(Direction direction_, int64_t efficiency_)
       : info_(BuildingType::Miner, efficiency_, {1, 1}, direction_) {}
@@ -68,6 +94,12 @@ struct Miner final : public Building {
   unique_ptr<Building> clone() const override {
     return std::make_unique<Miner>(*this);
   }
+
+  vector<vec::Vec2<size_t>> output_positions(MapAccessor&) const override;
+
+  Buffer<Ore> output() override { return this->ores.take(); }
+
+  void update(MapAccessor m) override;
 
   ~Miner() override = default;
 };
@@ -109,8 +141,6 @@ struct Cutter final : public Building {
 struct TrashCan final : public Building {
   BuildingInfo info_;
 
-  void input(Context &ctx) {}
-
   explicit TrashCan(Direction direction_, int64_t efficiency_)
       : info_(BuildingType::TrashCan, efficiency_, {1, 1}, direction_) {}
 
@@ -126,3 +156,5 @@ struct TrashCan final : public Building {
 };
 
 } // namespace shapezx
+
+#endif
