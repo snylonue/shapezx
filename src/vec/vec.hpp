@@ -2,15 +2,16 @@
 #define SHAPEZX_VEC_VEC_HPP
 
 #include <concepts>
+#include <cstddef>
 
 namespace shapezx::vec {
 
 // clang-format off
-template <typename T>
-concept Arithmetic = requires(T x) {
-  { x * x } -> std::same_as<T>;
-  { x + x } -> std::same_as<T>;
-  { x - x } -> std::same_as<T>;
+template <typename T, typename U = T>
+concept Arithmetic = requires(T x, U y) {
+  { x * y } -> std::same_as<T>;
+  { x + y } -> std::same_as<T>;
+  { x - y } -> std::same_as<T>;
 };
 
 template <typename K, typename T>
@@ -25,13 +26,19 @@ template <Arithmetic T> struct Vec2 {
 
   Vec2() = delete;
   explicit Vec2(const T a1, const T a2) : data({a1, a2}) {}
-  explicit Vec2(const T &a1, const T &a2) : data({a1, a2}) {}
 
-  Vec2 operator+(const Vec2 &rhs) const {
+  template<typename Self>
+  auto&& operator[](this Self&& self, size_t i) {
+    return self.data[i];
+  }
+
+  template<typename U = T>
+  Vec2<T> operator+(const Vec2<U> &rhs) const requires Arithmetic<T, U> {
     return {this->data[0] + rhs.data[0], this->data[1] + rhs.data[1]};
   }
 
-  Vec2 operator-(const Vec2 &rhs) const {
+  template<typename U = T>
+  Vec2<T> operator-(const Vec2<U> &rhs) const requires Arithmetic<T, U> {
     return {this->data[0] - rhs.data[0], this->data[1] - rhs.data[1]};
   }
 
@@ -49,7 +56,8 @@ template <Arithmetic T> struct Vec2 {
     return {this->data[0] / rhs, this->data[1] / rhs};
   }
 
-  T operator*(const Vec2 &rhs) const {
+  template<typename U = T>
+  T operator*(const Vec2 &rhs) const requires Arithmetic<T, U> {
     return this->data[0] * rhs.data[0] + this->data[1] * rhs.data[1];
   }
 };
