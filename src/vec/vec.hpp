@@ -25,7 +25,7 @@ template <Arithmetic T> struct Vec2 {
   T data[2];
 
   Vec2() = delete;
-  explicit Vec2(const T a1, const T a2) : data({a1, a2}) {}
+  Vec2(const T a1, const T a2) : data({a1, a2}) {}
 
   template<typename Self>
   auto&& operator[](this Self&& self, size_t i) {
