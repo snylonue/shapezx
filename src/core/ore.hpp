@@ -1,3 +1,6 @@
+#ifndef SHAPEZX_CORE_ORE
+#define SHAPEZX_CORE_ORE
+
 #include <cstdint>
 #include <string>
 
@@ -11,3 +14,5 @@ struct Ore {
   int64_t value;
 };
 } // namespace shapezx
+
+#endif
