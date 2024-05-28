@@ -1,8 +1,8 @@
 #ifndef SHAPEZX_VEC_VEC_HPP
 #define SHAPEZX_VEC_VEC_HPP
 
+#include <array>
 #include <concepts>
-#include <cstddef>
 
 namespace shapezx::vec {
 
@@ -22,14 +22,13 @@ concept Scalar = Arithmetic<K> && requires(K c, T x) {
 // clang-format on
 
 template <Arithmetic T> struct Vec2 {
-  T data[2];
+  std::array<T, 2> data;
 
   Vec2() = delete;
   Vec2(const T a1, const T a2) : data({a1, a2}) {}
 
-  template<typename Self>
-  auto&& operator[](this Self&& self, size_t i) {
-    return self.data[i];
+  auto&& operator[](this auto&& self, std::integral auto i) {
+    return self.data.at(i);
   }
 
   template<typename U = T>
