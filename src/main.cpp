@@ -1,14 +1,19 @@
-#include "app.h"
- 
+#include <gtkmm.h>
+#include <gtkmm/application.h>
+
 #include "core/core.hpp"
 
-int main(int argc, char **argv)
-{
-    auto core = shapezx::Map{{shapezx::Chunk{}}, 1, 1};
+class MyWindow : public Gtk::Window {
+public:
+  MyWindow() {
+    set_title("Basic application");
+    set_default_size(200, 200);
+  }
+};
 
-    auto hello_world = HelloWorld::create();
-    hello_world->set_my_label("Hello from C++");
-    // Show the window and spin the event loop until the window is closed.
-    hello_world->run();
-    return 0;
+int main(int argc, char **argv) {
+  auto core = shapezx::Map{{shapezx::Chunk{}}, 1, 1};
+
+  auto app = Gtk::Application::create();
+  return app->make_window_and_run<MyWindow>(argc, argv);
 }
