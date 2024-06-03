@@ -63,10 +63,12 @@ void Miner::update(MapAccessor m) {
   }
 }
 
-vector<vec::Vec2<size_t>> Miner::output_positions(MapAccessor &m) const {
-  return std::views::transform(ALL_DIRECTIONS, to_vec2) |
+Capability Miner::output_capabilities(MapAccessor &m) const {
+  return {
+    .positions = std::views::transform(ALL_DIRECTIONS, to_vec2) |
          std::views::transform(
              [&](const auto d) { return m.relative_pos_by(d); }) |
-         std::ranges::to<vector>();
+         std::ranges::to<vector>()
+  };
 }
 } // namespace shapezx

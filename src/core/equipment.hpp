@@ -55,6 +55,11 @@ template <typename Item> struct Buffer {
   }
 };
 
+struct Capability {
+  vector<vec::Vec2<size_t>> positions;
+  Buffer<Ore> items;
+};
+
 struct BuildingInfo {
   BuildingType type;
   int64_t efficiency;
@@ -68,11 +73,15 @@ struct Building {
   virtual BuildingInfo info() const = 0;
   virtual unique_ptr<Building> clone() const = 0;
 
-  virtual vector<vec::Vec2<size_t>> input_positions(MapAccessor&) const { return {}; }
-  virtual vector<vec::Vec2<size_t>> output_positions(MapAccessor&) const { return {}; }
+  virtual Capability input_capabilities(MapAccessor &) const {
+    return {};
+  }
+  virtual Capability output_capabilities(MapAccessor &) const {
+    return {};
+  }
 
-  virtual void input(Buffer<Ore>){};
-  virtual Buffer<Ore> output() { return Buffer<Ore>(); };
+  virtual void input(Capability){};
+  virtual Buffer<Ore> output(Capability) { return Buffer<Ore>(); };
 
   // update internal state by 1 tick
   virtual void update(MapAccessor);
@@ -95,9 +104,10 @@ struct Miner final : public Building {
     return std::make_unique<Miner>(*this);
   }
 
-  vector<vec::Vec2<size_t>> output_positions(MapAccessor&) const override;
+  Capability output_capabilities(MapAccessor &) const override;
 
-  Buffer<Ore> output() override { return this->ores.take(); }
+  void input(Capability) override;
+  Buffer<Ore> output(Capability) override { return this->ores.take(); }
 
   void update(MapAccessor m) override;
 
