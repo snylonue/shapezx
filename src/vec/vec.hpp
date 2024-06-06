@@ -3,6 +3,7 @@
 
 #include <array>
 #include <concepts>
+#include <cstddef>
 
 namespace shapezx::vec {
 
@@ -21,7 +22,7 @@ concept Scalar = Arithmetic<K> && requires(K c, T x) {
 };
 // clang-format on
 
-template <Arithmetic T> struct Vec2 {
+template <Arithmetic T = std::size_t> struct Vec2 {
   std::array<T, 2> data;
 
   Vec2() = delete;

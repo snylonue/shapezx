@@ -44,7 +44,7 @@ public:
                                    std::views::enumerate) {
       for (auto const [c, ck] : row | std::views::enumerate) {
         auto &chunk = this->chunks.emplace_back(
-            map[r, c], shapezx::vec::Vec2<std::size_t>(r, c));
+            map[r, c], shapezx::vec::Vec2<>(r, c));
         this->attach(chunk, c, r);
       }
     }

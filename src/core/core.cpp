@@ -1,6 +1,8 @@
 #include "core.hpp"
 #include "equipment.hpp"
 
+#include <ranges>
+
 namespace shapezx {
 
 void Chunk::update(MapAccessor m) {
@@ -11,10 +13,10 @@ void Chunk::update(MapAccessor m) {
 }
 
 void Map::update() {
-  for (auto [r, row] : this->chunks | std::ranges::views::chunk(this->width) |
+  for (auto const [r, row] : this->chunks | std::ranges::views::chunk(this->width) |
                            std::ranges::views::enumerate) {
-    for (auto [c, chunk] : row | std::ranges::views::enumerate) {
-      auto acc = MapAccessor(vec::Vec2<std::size_t>(r, c), *this);
+    for (auto const [c, chunk] : row | std::ranges::views::enumerate) {
+      auto acc = MapAccessor(vec::Vec2<>(r, c), *this);
       chunk.update(acc);
     }
   }
