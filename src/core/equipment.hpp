@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <optional>
 #include <string>
@@ -73,12 +74,8 @@ struct Building {
   virtual BuildingInfo info() const = 0;
   virtual unique_ptr<Building> clone() const = 0;
 
-  virtual Capability input_capabilities(MapAccessor &) const {
-    return {};
-  }
-  virtual Capability output_capabilities(MapAccessor &) const {
-    return {};
-  }
+  virtual Capability input_capabilities(MapAccessor &) const { return {}; }
+  virtual Capability output_capabilities(MapAccessor &) const { return {}; }
 
   virtual void input(Capability){};
   virtual Buffer<Ore> output(Capability) { return Buffer<Ore>(); };
@@ -166,5 +163,28 @@ struct TrashCan final : public Building {
 };
 
 } // namespace shapezx
+
+namespace std {
+template <> struct std::formatter<shapezx::BuildingType> {
+  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+
+  auto format(const shapezx::BuildingType &build_type,
+              std::format_context &ctx) const {
+    switch (build_type) {
+
+    case shapezx::BuildingType::Miner:
+      return std::format_to(ctx.out(), "miner");
+    case shapezx::BuildingType::Belt:
+      return std::format_to(ctx.out(), "belt");
+    case shapezx::BuildingType::Cutter:
+      return std::format_to(ctx.out(), "cutter");
+    case shapezx::BuildingType::TrashCan:
+      return std::format_to(ctx.out(), "trashcan");
+    case shapezx::BuildingType::PlaceHolder:
+      return std::format_to(ctx.out(), "placeholder");
+    }
+  }
+};
+} // namespace std
 
 #endif
