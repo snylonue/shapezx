@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <type_traits>
 #include <vector>
@@ -27,6 +28,8 @@ struct Chunk {
   Chunk(const Chunk &chunk)
       : ore(chunk.ore), building(chunk.building.transform(
                             [](const auto &b) { return b->clone(); })) {}
+
+      void update(MapAccessor);
 };
 
 struct Map {
@@ -42,6 +45,8 @@ struct Map {
   Chunk& operator[](size_t x, size_t y) {
     return chunks[x * this->width + y];
   }
+
+  void update();
 };
 
 struct MapAccessor {
