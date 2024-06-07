@@ -1,5 +1,5 @@
 #include "core.hpp"
-#include "equipment.hpp"
+#include "machine.hpp"
 
 #include <ranges>
 

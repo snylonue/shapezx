@@ -2,12 +2,13 @@
 #define SHAPEZX_CORE_HPP
 
 #include "../vec/vec.hpp"
-#include "equipment.hpp"
+#include "machine.hpp"
 #include "ore.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <span>
@@ -80,7 +81,10 @@ struct State {
   State(const Map &&map_, const Context &&ctx_)
       : map(std::move(map_)), ctx(std::move(ctx_)) {}
 
-  void update() { this->map.update(this->ctx); }
+  void update() {
+    // std::cout << "updating\n";
+    this->map.update(this->ctx);
+  }
 };
 } // namespace shapezx
 

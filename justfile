@@ -1,6 +1,6 @@
 set windows-shell := ["pwsh", "-NoLogo", "-NoProfileLoadTime", "-Command"]
 
 build:
-    cmake --build build
+    cmake --build build-debug
 run: build
-    ./build/shapezx
+    ./build-debug/shapezx

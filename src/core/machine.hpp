@@ -1,5 +1,5 @@
-#ifndef SHAPEZX_CORE_EQUIPMENT
-#define SHAPEZX_CORE_EQUIPMENT
+#ifndef SHAPEZX_CORE_MACHINE
+#define SHAPEZX_CORE_MACHINE
 
 #include "../vec/vec.hpp"
 #include "ore.hpp"

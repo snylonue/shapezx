@@ -1,16 +1,16 @@
 #include "core/core.hpp"
 #include "vec/vec.hpp"
 
-#include <cstddef>
+#include <sigc++/connection.h>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
 #include <gtkmm/button.h>
 #include <gtkmm/enums.h>
 #include <gtkmm/gridview.h>
 #include <gtkmm/label.h>
-#include <gtkmm/textview.h>
 #include <gtkmm/widget.h>
 
+#include <cstddef>
 #include <format>
 #include <iostream>
 #include <ostream>
@@ -37,6 +37,7 @@ public:
 class Map : public Gtk::Grid {
 public:
   explicit Map(const shapezx::Map &map) {
+    std::cout << map.width << '\n';
     for (auto const [r, row] : map.chunks |
                                    std::views::chunk(map.width) |
                                    std::views::enumerate) {
@@ -59,21 +60,36 @@ public:
 
   explicit MainGame(const shapezx::State &&state)
       : state(std::move(state)), map(this->state.map) {
+    
+    // should be disconnected before destructing
+    this->timer = Glib::signal_timeout().connect([this]() {
+      this->state.update();
+      return true;
+    }, 20);
+
     this->set_title("shapezx");
     this->set_default_size(1920, 1080);
 
     this->set_child(this->map);
   }
 
-  ~MainGame() = default;
+  ~MainGame() {
+    timer.disconnect();
+  }
+
+  bool on_close_request() override {
+    return false;
+  }
+
+protected:
+  sigc::connection timer;
 };
 
 int main(int argc, char **argv) {
-  auto core = shapezx::Map{2, 2};
+  auto core = shapezx::Map{20, 30};
   auto state = shapezx::State(std::move(core), shapezx::Context());
 
   auto app = Gtk::Application::create();
 
-  auto loop = Glib::MainLoop::create();
   return app->make_window_and_run<MainGame>(argc, argv, std::move(state));
 }
