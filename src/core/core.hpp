@@ -7,6 +7,8 @@
 
 
 #include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -22,6 +24,10 @@ using std::unique_ptr;
 using std::vector;
 
 using ssize_t = std::make_signed_t<size_t>;
+
+struct Context {
+  std::int32_t efficiency_factor = 1;
+};
 
 struct Chunk {
   optional<Ore> ore;
@@ -47,14 +53,15 @@ struct Map {
 
   Chunk &operator[](size_t x, size_t y) { return chunks[x * this->width + y]; }
 
-  void update();
+  void update(Context &ctx);
 };
 
 struct MapAccessor {
   vec::Vec2<size_t> pos;
-  Map &map;
+  std::reference_wrapper<Map> map;
+  std::reference_wrapper<Context> ctx;
 
-  MapAccessor(vec::Vec2<size_t> p, Map &m) : pos(p), map(m) {}
+  MapAccessor(vec::Vec2<size_t> p, Map &m, Context &ctx_) : pos(p), map(m), ctx(ctx_) {}
 
   Chunk &current_chunk() { return map[pos[0], pos[1]]; }
 
