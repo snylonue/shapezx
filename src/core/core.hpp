@@ -75,6 +75,12 @@ struct MapAccessor {
 
 struct State {
   Map map;
+  Context ctx;
+
+  State(const Map &&map_, const Context &&ctx_)
+      : map(std::move(map_)), ctx(std::move(ctx_)) {}
+
+  void update() { this->map.update(this->ctx); }
 };
 } // namespace shapezx
 
