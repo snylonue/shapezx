@@ -4,16 +4,11 @@
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    devenv = {
-      url = "github:cachix/devenv";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
+ };
 
   outputs = inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
-        inputs.devenv.flakeModule
         # To import a flake module
         # 1. Add foo to inputs
         # 2. Add foo as a parameter to the outputs function
@@ -28,11 +23,11 @@
 
         # Equivalent to  inputs'.nixpkgs.legacyPackages.hello;
         # packages.default = pkgs.hello;
-        devenv.shells.default = {
-          packages = [ pkgs.clang-tools ];
-
-          # languages.cplusplus.enable = true;
-        };
+        devShells.default = pkgs.mkShell {
+          packages = [
+            pkgs.clang-tools
+          ];
+        };   
       };
       flake = {
         # The usual flake attributes can be defined here, including system-
