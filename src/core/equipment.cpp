@@ -71,4 +71,12 @@ Capability Miner::output_capabilities(MapAccessor &m) const {
          std::ranges::to<vector>()
   };
 }
+
+void Belt::update(MapAccessor) {
+  this->progress += 10;
+  if (this->progress == 100) {
+    // todo
+    this->progress = 0;
+  }
+}
 } // namespace shapezx

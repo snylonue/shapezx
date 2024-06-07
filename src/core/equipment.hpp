@@ -113,6 +113,7 @@ struct Miner final : public Building {
 
 struct Belt final : public Building {
   BuildingInfo info_;
+  std::uint32_t progress = 0;
 
   explicit Belt(Direction direction_, int64_t efficiency_)
       : info_(BuildingType::Belt, efficiency_, {1, 1}, direction_) {}
@@ -120,6 +121,8 @@ struct Belt final : public Building {
   Belt(const Belt &) = default;
 
   BuildingInfo info() const override { return this->info_; }
+
+  void update(MapAccessor) override;
 
   unique_ptr<Building> clone() const override {
     return std::make_unique<Belt>(*this);
