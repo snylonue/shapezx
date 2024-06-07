@@ -5,7 +5,6 @@
 #include "equipment.hpp"
 #include "ore.hpp"
 
-
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -51,7 +50,9 @@ struct Map {
       : chunks(chks), height(h), width(w) {}
   Map(size_t h, size_t w) : chunks(h * w), height(h), width(w) {}
 
-  Chunk &operator[](size_t x, size_t y) { return chunks[x * this->width + y]; }
+  auto &operator[](this auto &&self, size_t x, size_t y) {
+    return self.chunks[x * self.width + y];
+  }
 
   void update(Context &ctx);
 };
@@ -61,7 +62,8 @@ struct MapAccessor {
   std::reference_wrapper<Map> map;
   std::reference_wrapper<Context> ctx;
 
-  MapAccessor(vec::Vec2<size_t> p, Map &m, Context &ctx_) : pos(p), map(m), ctx(ctx_) {}
+  MapAccessor(vec::Vec2<size_t> p, Map &m, Context &ctx_)
+      : pos(p), map(m), ctx(ctx_) {}
 
   Chunk &current_chunk() { return map.get()[pos[0], pos[1]]; }
 
