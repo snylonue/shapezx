@@ -1,6 +1,8 @@
 #include "core/core.hpp"
 #include "vec/vec.hpp"
+#include "ui/machine.hpp"
 
+#include <gtkmm/listboxrow.h>
 #include <sigc++/connection.h>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
@@ -57,6 +59,8 @@ class MainGame : public Gtk::Window {
 public:
   shapezx::State state;
   Map map;
+  shapezx::ui::MachineSelector machines;
+  Gtk::ListBox box;
 
   explicit MainGame(const shapezx::State &&state)
       : state(std::move(state)), map(this->state.map) {
@@ -70,7 +74,10 @@ public:
     this->set_title("shapezx");
     this->set_default_size(1920, 1080);
 
-    this->set_child(this->map);
+    this->box.append(this->map);
+    this->box.append(this->machines);
+
+    this->set_child(this->box);
   }
 
   ~MainGame() {
@@ -86,7 +93,7 @@ protected:
 };
 
 int main(int argc, char **argv) {
-  auto core = shapezx::Map{20, 30};
+  auto core = shapezx::Map{2, 3};
   auto state = shapezx::State(std::move(core), shapezx::Context());
 
   auto app = Gtk::Application::create();
