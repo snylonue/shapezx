@@ -63,7 +63,7 @@ struct MapAccessor {
 
   MapAccessor(vec::Vec2<size_t> p, Map &m, Context &ctx_) : pos(p), map(m), ctx(ctx_) {}
 
-  Chunk &current_chunk() { return map[pos[0], pos[1]]; }
+  Chunk &current_chunk() { return map.get()[pos[0], pos[1]]; }
 
   // Returns r + current position .
   vec::Vec2<size_t> relative_pos_by(vec::Vec2<ssize_t> r) {
