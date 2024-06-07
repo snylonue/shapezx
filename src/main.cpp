@@ -20,7 +20,7 @@
 
 class Chunk : public Gtk::Button {
 public:
-  explicit Chunk(shapezx::Chunk ck, shapezx::vec::Vec2<std::size_t> pos) {
+  explicit Chunk(const shapezx::Chunk& ck, shapezx::vec::Vec2<std::size_t> pos) {
     this->set_label(std::format("{} at ({} {})",
                                 ck.building
                                     .transform([](auto const &b) {
@@ -36,15 +36,13 @@ public:
 
 class Map : public Gtk::Grid {
 public:
-  shapezx::Map map;
-
-  explicit Map(const shapezx::Map &&m) : map(std::move(m)) {
-    for (auto const [r, row] : this->map.chunks |
-                                   std::views::chunk(this->map.width) |
+  explicit Map(const shapezx::Map &map) {
+    for (auto const [r, row] : map.chunks |
+                                   std::views::chunk(map.width) |
                                    std::views::enumerate) {
       for (auto const [c, ck] : row | std::views::enumerate) {
-        auto &chunk = this->chunks.emplace_back(
-            map[r, c], shapezx::vec::Vec2<>(r, c));
+        auto &chunk =
+            this->chunks.emplace_back(map[r, c], shapezx::vec::Vec2<>(r, c));
         this->attach(chunk, c, r);
       }
     }
@@ -54,23 +52,28 @@ protected:
   std::vector<Chunk> chunks;
 };
 
-class MyWindow : public Gtk::Window {
+class MainGame : public Gtk::Window {
 public:
+  shapezx::State state;
   Map map;
 
-  explicit MyWindow(const shapezx::Map &&m) : map(std::move(m)) {
+  explicit MainGame(const shapezx::State &&state)
+      : state(std::move(state)), map(this->state.map) {
     this->set_title("shapezx");
     this->set_default_size(1920, 1080);
 
     this->set_child(this->map);
   }
 
-  ~MyWindow() = default;
+  ~MainGame() = default;
 };
 
 int main(int argc, char **argv) {
   auto core = shapezx::Map{2, 2};
+  auto state = shapezx::State(std::move(core), shapezx::Context());
 
   auto app = Gtk::Application::create();
-  return app->make_window_and_run<MyWindow>(argc, argv, std::move(core));
+
+  auto loop = Glib::MainLoop::create();
+  return app->make_window_and_run<MainGame>(argc, argv, std::move(state));
 }
