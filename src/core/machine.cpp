@@ -65,10 +65,11 @@ void Miner::update(MapAccessor m) {
 
 Capability Miner::output_capabilities(MapAccessor &m) const {
   return {
-    .positions = std::views::transform(ALL_DIRECTIONS, to_vec2) |
-         std::views::transform(
-             [&](const auto d) { return m.relative_pos_by(d); }) |
-         std::ranges::to<vector>()
+      .positions = std::views::transform(ALL_DIRECTIONS, to_vec2) |
+                   std::views::transform(
+                       [&](const auto d) { return m.relative_pos_by(d); }) |
+                   std::ranges::to<vector>(),
+      .items = {},
   };
 }
 

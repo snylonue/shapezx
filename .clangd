@@ -1,2 +1,2 @@
-CompileFlags:                     # Tweak the parse settings
-  Add: [-std=c++23]
+CompileFlags:
+  Add: [ -std=c++23, -Wall, -Wextra ]

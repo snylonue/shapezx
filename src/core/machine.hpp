@@ -83,7 +83,7 @@ struct Building {
   // update internal state by 1 tick
   virtual void update(MapAccessor);
 
-  virtual ~Building() = 0;
+  virtual ~Building() = default;
 };
 
 struct Miner final : public Building {
@@ -103,7 +103,9 @@ struct Miner final : public Building {
 
   Capability output_capabilities(MapAccessor &) const override;
 
-  void input(Capability) override;
+  void input(Capability) override {
+    // todo
+  };
   Buffer<Ore> output(Capability) override { return this->ores.take(); }
 
   void update(MapAccessor m) override;

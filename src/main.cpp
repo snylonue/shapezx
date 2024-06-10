@@ -1,75 +1,123 @@
 #include "core/core.hpp"
-#include "vec/vec.hpp"
+#include "core/machine.hpp"
 #include "ui/machine.hpp"
+#include "vec/vec.hpp"
 
-#include <gtkmm/listboxrow.h>
-#include <sigc++/connection.h>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
 #include <gtkmm/button.h>
 #include <gtkmm/enums.h>
 #include <gtkmm/gridview.h>
 #include <gtkmm/label.h>
+#include <gtkmm/listboxrow.h>
 #include <gtkmm/widget.h>
+#include <sigc++/connection.h>
+#include <sigc++/signal.h>
 
 #include <cstddef>
 #include <format>
-#include <iostream>
-#include <ostream>
+#include <functional>
+#include <memory>
+#include <optional>
 #include <ranges>
 #include <utility>
 #include <vector>
 
+struct UIState {
+  std::optional<shapezx::BuildingType> machine_selected = std::nullopt;
+};
+
 class Chunk : public Gtk::Button {
 public:
-  explicit Chunk(const shapezx::Chunk& ck, shapezx::vec::Vec2<std::size_t> pos) {
+  shapezx::vec::Vec2<std::size_t> pos;
+  std::reference_wrapper<const UIState> ui_state;
+  std::reference_wrapper<shapezx::State> game_state;
+
+  explicit Chunk(shapezx::vec::Vec2<std::size_t> pos_, const UIState &ui_state,
+                 shapezx::State &game_state)
+      : pos(pos_), ui_state(ui_state), game_state(game_state) {
+    this->reset_label();
+    this->set_expand();
+  }
+
+  void on_clicked() override {
+    if (auto placing = this->ui_state.get().machine_selected) {
+      std::unique_ptr<shapezx::Building> machine;
+      switch (*placing) {
+      case shapezx::BuildingType::Miner:
+        machine = std::make_unique<shapezx::Miner>(shapezx::Direction::Down, 1);
+        break;
+      case shapezx::BuildingType::Belt:
+      case shapezx::BuildingType::Cutter:
+      case shapezx::BuildingType::TrashCan:
+      case shapezx::BuildingType::PlaceHolder:
+        return;
+        break;
+      }
+
+      this->game_state.get().map.add_machine(this->pos, std::move(machine));
+      this->reset_label();
+    }
+  }
+
+  void reset_label() {
     this->set_label(std::format("{} at ({} {})",
-                                ck.building
+                                this->game_state.get()
+                                    .map[this->pos]
+                                    .building
                                     .transform([](auto const &b) {
                                       return std::format("{}", b->info().type);
                                     })
                                     .value_or("none"),
-                                pos[0], pos[1]));
-    this->set_expand();
-    this->signal_clicked().connect(
-        [=]() { std::println(std::cout, "clicked ({} {})", pos[0], pos[1]); });
+                                this->pos[0], this->pos[1]));
   }
 };
 
 class Map : public Gtk::Grid {
 public:
-  explicit Map(const shapezx::Map &map) {
-    std::cout << map.width << '\n';
-    for (auto const [r, row] : map.chunks |
-                                   std::views::chunk(map.width) |
-                                   std::views::enumerate) {
-      for (auto const [c, ck] : row | std::views::enumerate) {
-        auto &chunk =
-            this->chunks.emplace_back(map[r, c], shapezx::vec::Vec2<>(r, c));
+  std::vector<Chunk> chunks;
+
+  explicit Map(const UIState &ui_state, shapezx::State &game_state) {
+    for (auto const r :
+         std::views::iota(std::size_t(0), game_state.map.height)) {
+      for (auto const c :
+           std::views::iota(std::size_t(0), game_state.map.width)) {
+        auto &chunk = this->chunks.emplace_back(shapezx::vec::Vec2(r, c),
+                                                ui_state, game_state);
         this->attach(chunk, c, r);
       }
     }
   }
-
-protected:
-  std::vector<Chunk> chunks;
 };
 
 class MainGame : public Gtk::Window {
-public:
+protected:
   shapezx::State state;
+  UIState ui_state;
+  sigc::signal<void(shapezx::BuildingType)> on_placing_machine_begin;
   Map map;
-  shapezx::ui::MachineSelector machines;
+  sigc::connection timer_conn;
+  sigc::connection machine_selected_conn;
   Gtk::ListBox box;
+  shapezx::ui::MachineSelector machines;
 
-  explicit MainGame(const shapezx::State &&state)
-      : state(std::move(state)), map(this->state.map) {
-    
+public:
+  explicit MainGame(shapezx::State &&state)
+      : state(std::move(state)), map(this->ui_state, this->state) {
+
     // should be disconnected before destructing
-    this->timer = Glib::signal_timeout().connect([this]() {
-      this->state.update();
-      return true;
-    }, 20);
+    this->timer_conn = Glib::signal_timeout().connect(
+        [this]() {
+          this->state.update();
+          return true;
+        },
+        20);
+
+    this->machine_selected_conn =
+        this->machines.signal_machine_selected().connect(
+            [&](shapezx::BuildingType type) {
+              this->ui_state.machine_selected = type;
+            });
 
     this->set_title("shapezx");
     this->set_default_size(1920, 1080);
@@ -80,16 +128,13 @@ public:
     this->set_child(this->box);
   }
 
+  MainGame(const MainGame &) = delete;
+  MainGame(MainGame &&) = delete;
+
   ~MainGame() {
-    timer.disconnect();
+    this->timer_conn.disconnect();
+    this->machine_selected_conn.disconnect();
   }
-
-  bool on_close_request() override {
-    return false;
-  }
-
-protected:
-  sigc::connection timer;
 };
 
 int main(int argc, char **argv) {

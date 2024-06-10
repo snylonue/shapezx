@@ -51,7 +51,15 @@ struct Map {
   Map(size_t h, size_t w) : chunks(h * w), height(h), width(w) {}
 
   auto &operator[](this auto &&self, size_t x, size_t y) {
-    return self.chunks[x * self.width + y];
+    return self.chunks.at(x * self.width + y);
+  }
+
+  auto &operator[](this auto &&self, vec::Vec2<std::size_t> pos) {
+    return self[pos[0], pos[1]];
+  }
+
+  void add_machine(vec::Vec2<std::size_t> pos, unique_ptr<Building>&& machine) {
+    (*this)[pos].building = std::make_optional(std::move(machine));
   }
 
   void update(Context &ctx);
