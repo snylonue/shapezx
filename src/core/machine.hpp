@@ -71,6 +71,11 @@ struct BuildingInfo {
 struct MapAccessor;
 
 struct Building {
+  template<typename T>
+  static unique_ptr<Building> create(Direction d, int64_t efficiency) {
+    return std::make_unique<T>(d, efficiency);
+  }
+
   virtual BuildingInfo info() const = 0;
   virtual unique_ptr<Building> clone() const = 0;
 
