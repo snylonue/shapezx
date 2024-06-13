@@ -41,7 +41,8 @@ public:
   }
 
   void on_clicked() override {
-    if (auto placing = this->ui_state.get().machine_selected) {
+    if (auto placing = this->ui_state.get().machine_selected;
+        placing && !this->game_state.get().map[this->pos].building.has_value()) {
       std::unique_ptr<shapezx::Building> machine;
       switch (*placing) {
       case shapezx::BuildingType::Miner:
@@ -86,7 +87,7 @@ class Map : public Gtk::Grid {
 public:
   std::vector<Chunk> chunks;
 
-  explicit Map(const UIState &ui_state, shapezx::State &game_state) {
+  explicit Map(UIState const &ui_state, shapezx::State &game_state) {
     for (auto const r :
          std::views::iota(std::size_t(0), game_state.map.height)) {
       for (auto const c :
