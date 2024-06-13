@@ -29,20 +29,18 @@ struct UIState {
 
 class Chunk : public Gtk::Button {
 public:
-  shapezx::vec::Vec2<std::size_t> pos;
+  shapezx::MapAccessor map_accessor;
   std::reference_wrapper<const UIState> ui_state;
-  std::reference_wrapper<shapezx::State> game_state;
 
-  explicit Chunk(shapezx::vec::Vec2<std::size_t> pos_, const UIState &ui_state,
-                 shapezx::State &game_state)
-      : pos(pos_), ui_state(ui_state), game_state(game_state) {
+  explicit Chunk(shapezx::MapAccessor current_chunk_, const UIState &ui_state)
+      : map_accessor(current_chunk_), ui_state(ui_state) {
     this->reset_label();
     this->set_expand();
   }
 
   void on_clicked() override {
     if (auto placing = this->ui_state.get().machine_selected;
-        placing && !this->game_state.get().map[this->pos].building.has_value()) {
+        placing && !this->map_accessor.current_chunk().building) {
       std::unique_ptr<shapezx::Building> machine;
       switch (*placing) {
       case shapezx::BuildingType::Miner:
@@ -65,21 +63,21 @@ public:
         return;
       }
 
-      this->game_state.get().map.add_machine(this->pos, std::move(machine));
+      this->map_accessor.add_machine(std::move(machine));
       this->reset_label();
     }
   }
 
   void reset_label() {
     this->set_label(std::format("{} at ({} {})",
-                                this->game_state.get()
-                                    .map[this->pos]
+                                this->map_accessor.current_chunk()
                                     .building
                                     .transform([](auto const &b) {
                                       return std::format("{}", b->info().type);
                                     })
                                     .value_or("none"),
-                                this->pos[0], this->pos[1]));
+                                this->map_accessor.pos[0],
+                                this->map_accessor.pos[1]));
   }
 };
 
@@ -92,8 +90,8 @@ public:
          std::views::iota(std::size_t(0), game_state.map.height)) {
       for (auto const c :
            std::views::iota(std::size_t(0), game_state.map.width)) {
-        auto &chunk = this->chunks.emplace_back(shapezx::vec::Vec2(r, c),
-                                                ui_state, game_state);
+        auto &chunk = this->chunks.emplace_back(
+            game_state.create_accessor_at({r, c}), ui_state);
         this->attach(chunk, c, r);
       }
     }
@@ -125,7 +123,7 @@ public:
 
     this->machine_selected_conn =
         this->machines.signal_machine_selected().connect(
-            [&](shapezx::BuildingType type) {
+            [this](shapezx::BuildingType type) {
               this->ui_state.machine_selected = type;
             });
 

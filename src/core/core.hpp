@@ -58,7 +58,7 @@ struct Map {
     return self[pos[0], pos[1]];
   }
 
-  void add_machine(vec::Vec2<std::size_t> pos, unique_ptr<Building>&& machine) {
+  void add_machine(vec::Vec2<std::size_t> pos, unique_ptr<Building> &&machine) {
     (*this)[pos].building = std::make_optional(std::move(machine));
   }
 
@@ -73,11 +73,17 @@ struct MapAccessor {
   MapAccessor(vec::Vec2<size_t> p, Map &m, Context &ctx_)
       : pos(p), map(m), ctx(ctx_) {}
 
-  Chunk &current_chunk() { return map.get()[pos[0], pos[1]]; }
+  auto &current_chunk(this auto &&self) {
+    return self.map.get()[self.pos[0], self.pos[1]];
+  }
 
   // Returns r + current position .
   vec::Vec2<size_t> relative_pos_by(vec::Vec2<ssize_t> r) {
     return this->pos + r;
+  }
+
+  void add_machine(std::unique_ptr<shapezx::Building> &&machine) {
+    this->map.get().add_machine(this->pos, std::move(machine));
   }
 };
 
@@ -87,6 +93,10 @@ struct State {
 
   State(const Map &&map_, const Context &&ctx_)
       : map(std::move(map_)), ctx(std::move(ctx_)) {}
+
+  MapAccessor create_accessor_at(shapezx::vec::Vec2<std::size_t> pos) {
+    return {pos, this->map, this->ctx};
+  }
 
   void update() {
     // std::cout << "updating\n";
