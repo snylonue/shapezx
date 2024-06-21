@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <random>
 #include <span>
 #include <type_traits>
 #include <vector>
@@ -41,9 +42,25 @@ struct Chunk {
 };
 
 struct Map {
+  static constexpr double HAS_ORE_PROBALITY = 0.3;
+  static constexpr array<double, 2> DISTRIBUTION{0.9, 0.1};
+
   vector<Chunk> chunks;
   size_t height;
   size_t width;
+
+  Map(size_t h, size_t w, size_t seed) : chunks(h * w), height(h), width(w) {
+    std::mt19937_64 gen{seed};
+    std::bernoulli_distribution has_ore(HAS_ORE_PROBALITY);
+    std::discrete_distribution<size_t> ore_distribution(DISTRIBUTION.begin(),
+                                                        DISTRIBUTION.end());
+
+    for (auto &chk : this->chunks) {
+      if (has_ore(gen)) {
+        chk.ore = ORES[ore_distribution(gen)];
+      }
+    }
+  }
 
   // caller must guarantee that chks.size() == h * w
   Map(const vector<Chunk> &chks, size_t h, size_t w)
@@ -90,6 +107,10 @@ struct MapAccessor {
 struct State {
   Map map;
   Context ctx;
+
+  State(size_t height, size_t width, size_t seed) : map(height, width, seed) {}
+
+  State(size_t height, size_t width): State(height, width, std::random_device()()) {}
 
   State(const Map &&map_, const Context &&ctx_)
       : map(std::move(map_)), ctx(std::move(ctx_)) {}

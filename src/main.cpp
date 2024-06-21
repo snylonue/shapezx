@@ -39,6 +39,7 @@ public:
     this->set_expand(true);
     this->set_halign(Gtk::Align::FILL);
     this->set_valign(Gtk::Align::FILL);
+    // this->set();
   }
 
   void on_clicked() override {
@@ -105,65 +106,69 @@ public:
   }
 };
 
+struct Connections {
+  std::vector<sigc::connection> conns;
+
+  void add(sigc::connection &&conn) { conns.push_back(std::move(conn)); }
+
+  ~Connections() {
+    for (auto &conn : this->conns) {
+      conn.disconnect();
+    }
+  }
+};
+
 class MainGame : public Gtk::Window {
 protected:
   shapezx::State state;
   UIState ui_state;
   sigc::signal<void(shapezx::BuildingType)> on_placing_machine_begin;
   Map map;
-  sigc::connection timer_conn;
-  sigc::connection machine_selected_conn;
+  Connections conns;
   Gtk::Box box;
   shapezx::ui::MachineSelector machines;
 
 public:
   explicit MainGame(shapezx::State &&state)
-      : state(std::move(state)), map(this->ui_state, this->state), box(Gtk::Orientation::VERTICAL) {
+      : state(std::move(state)), map(this->ui_state, this->state),
+        box(Gtk::Orientation::VERTICAL) {
 
-    // should be disconnected before destructing
-    this->timer_conn = Glib::signal_timeout().connect(
+    this->conns.add(Glib::signal_timeout().connect(
         [this]() {
           this->state.update();
           return true;
         },
-        20);
+        20));
 
-    this->machine_selected_conn =
-        this->machines.signal_machine_selected().connect(
-            [this](shapezx::BuildingType type) {
-              this->ui_state.machine_selected = type;
-            });
+    this->conns.add(this->machines.signal_machine_selected().connect(
+        [this](shapezx::BuildingType type) {
+          this->ui_state.machine_selected = type;
+        }));
 
     this->set_title("shapezx");
     this->set_default_size(1920, 1080);
 
-    this->box.set_expand(true);
-    this->box.set_vexpand(true);
+    this->box.set_expand(false);
+    // this->box.set_vexpand(true);
     this->box.set_valign(Gtk::Align::FILL);
     this->box.set_halign(Gtk::Align::FILL);
 
     this->box.append(this->map);
     this->box.append(this->machines);
 
-    this->set_expand(true);
-    this->set_valign(Gtk::Align::FILL);
-    this->set_halign(Gtk::Align::FILL);
+    this->set_expand(false);
+    // this->set_valign(Gtk::Align::FILL);
+    // this->set_halign(Gtk::Align::FILL);
 
     this->set_child(this->box);
   }
 
   MainGame(const MainGame &) = delete;
   MainGame(MainGame &&) = delete;
-
-  ~MainGame() {
-    this->timer_conn.disconnect();
-    this->machine_selected_conn.disconnect();
-  }
 };
 
 int main(int argc, char **argv) {
-  auto core = shapezx::Map{2, 3};
-  auto state = shapezx::State(std::move(core), shapezx::Context());
+  auto state = shapezx::State(20, 30);
 
   auto app = Gtk::Application::create();
 
