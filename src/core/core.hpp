@@ -29,7 +29,7 @@ struct Context {
 };
 
 struct Chunk {
-  optional<Ore> ore;
+  optional<Item> ore;
   optional<unique_ptr<Building>> building;
 
   Chunk() = default;
