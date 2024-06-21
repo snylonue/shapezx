@@ -59,7 +59,7 @@ void Miner::update(MapAccessor m) {
     if (this->ores.num == 0) {
       this->ores.item = ore;
     }
-    this->ores.num += this->info_.efficiency;
+    this->ores.num += m.ctx.get().efficiency_factor * 1;
   }
 }
 

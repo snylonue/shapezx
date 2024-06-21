@@ -63,7 +63,6 @@ struct Capability {
 
 struct BuildingInfo {
   BuildingType type;
-  int64_t efficiency;
   pair<size_t, size_t> size;
   Direction direction;
 };
@@ -71,9 +70,8 @@ struct BuildingInfo {
 struct MapAccessor;
 
 struct Building {
-  template<typename T>
-  static unique_ptr<Building> create(Direction d, int64_t efficiency) {
-    return std::make_unique<T>(d, efficiency);
+  template <typename T> static unique_ptr<Building> create(Direction d) {
+    return std::make_unique<T>(d);
   }
 
   virtual BuildingInfo info() const = 0;
@@ -95,8 +93,8 @@ struct Miner final : public Building {
   BuildingInfo info_;
   Buffer<Item> ores;
 
-  explicit Miner(Direction direction_, int64_t efficiency_)
-      : info_(BuildingType::Miner, efficiency_, {1, 1}, direction_) {}
+  explicit Miner(Direction direction_)
+      : info_(BuildingType::Miner, {1, 1}, direction_) {}
 
   Miner(const Miner &) = default;
 
@@ -108,8 +106,8 @@ struct Miner final : public Building {
 
   Capability output_capabilities(MapAccessor &) const override;
 
-  void input(Capability) override {
-    // todo
+  void input(Capability) override{
+      // todo
   };
   Buffer<Item> output(Capability) override { return this->ores.take(); }
 
@@ -122,8 +120,8 @@ struct Belt final : public Building {
   BuildingInfo info_;
   std::uint32_t progress = 0;
 
-  explicit Belt(Direction direction_, int64_t efficiency_)
-      : info_(BuildingType::Belt, efficiency_, {1, 1}, direction_) {}
+  explicit Belt(Direction direction_)
+      : info_(BuildingType::Belt, {1, 1}, direction_) {}
 
   Belt(const Belt &) = default;
 
@@ -141,8 +139,8 @@ struct Belt final : public Building {
 struct Cutter final : public Building {
   BuildingInfo info_;
 
-  explicit Cutter(Direction direction_, int64_t efficiency_)
-      : info_(BuildingType::Cutter, efficiency_, {2, 1}, direction_) {}
+  explicit Cutter(Direction direction_)
+      : info_(BuildingType::Cutter, {2, 1}, direction_) {}
 
   Cutter(const Cutter &) = default;
 
@@ -158,8 +156,8 @@ struct Cutter final : public Building {
 struct TrashCan final : public Building {
   BuildingInfo info_;
 
-  explicit TrashCan(Direction direction_, int64_t efficiency_)
-      : info_(BuildingType::TrashCan, efficiency_, {1, 1}, direction_) {}
+  explicit TrashCan(Direction direction_)
+      : info_(BuildingType::TrashCan, {1, 1}, direction_) {}
 
   TrashCan(const TrashCan &) = default;
 

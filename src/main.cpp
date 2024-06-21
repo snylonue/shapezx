@@ -48,20 +48,20 @@ public:
       std::unique_ptr<shapezx::Building> machine;
       switch (*placing) {
       case shapezx::BuildingType::Miner:
-        machine = shapezx::Building::create<shapezx::Miner>(
-            shapezx::Direction::Down, 1);
+        machine =
+            shapezx::Building::create<shapezx::Miner>(shapezx::Direction::Down);
         break;
       case shapezx::BuildingType::Belt:
-        machine = shapezx::Building::create<shapezx::Belt>(
-            shapezx::Direction::Down, 1);
+        machine =
+            shapezx::Building::create<shapezx::Belt>(shapezx::Direction::Down);
         break;
       case shapezx::BuildingType::Cutter:
         machine = shapezx::Building::create<shapezx::Cutter>(
-            shapezx::Direction::Down, 1);
+            shapezx::Direction::Down);
         break;
       case shapezx::BuildingType::TrashCan:
         machine = shapezx::Building::create<shapezx::TrashCan>(
-            shapezx::Direction::Down, 1);
+            shapezx::Direction::Down);
         break;
       default:
         return;
