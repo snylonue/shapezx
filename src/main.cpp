@@ -9,6 +9,7 @@
 #include <gtkmm/enums.h>
 #include <gtkmm/gridview.h>
 #include <gtkmm/label.h>
+#include <gtkmm/listbox.h>
 #include <gtkmm/listboxrow.h>
 #include <gtkmm/widget.h>
 #include <sigc++/connection.h>
@@ -35,7 +36,9 @@ public:
   explicit Chunk(shapezx::MapAccessor current_chunk_, const UIState &ui_state)
       : map_accessor(current_chunk_), ui_state(ui_state) {
     this->reset_label();
-    this->set_expand();
+    this->set_expand(true);
+    this->set_halign(Gtk::Align::FILL);
+    this->set_valign(Gtk::Align::FILL);
   }
 
   void on_clicked() override {
@@ -85,7 +88,11 @@ class Map : public Gtk::Grid {
 public:
   std::vector<Chunk> chunks;
 
-  explicit Map(UIState const &ui_state, shapezx::State &game_state) {
+  explicit Map(const UIState &ui_state, shapezx::State &game_state) {
+    this->set_expand(true);
+    this->set_valign(Gtk::Align::FILL);
+    this->set_halign(Gtk::Align::FILL);
+
     for (auto const r :
          std::views::iota(std::size_t(0), game_state.map.height)) {
       for (auto const c :
@@ -106,12 +113,12 @@ protected:
   Map map;
   sigc::connection timer_conn;
   sigc::connection machine_selected_conn;
-  Gtk::ListBox box;
+  Gtk::Box box;
   shapezx::ui::MachineSelector machines;
 
 public:
   explicit MainGame(shapezx::State &&state)
-      : state(std::move(state)), map(this->ui_state, this->state) {
+      : state(std::move(state)), map(this->ui_state, this->state), box(Gtk::Orientation::VERTICAL) {
 
     // should be disconnected before destructing
     this->timer_conn = Glib::signal_timeout().connect(
@@ -130,8 +137,17 @@ public:
     this->set_title("shapezx");
     this->set_default_size(1920, 1080);
 
+    this->box.set_expand(true);
+    this->box.set_vexpand(true);
+    this->box.set_valign(Gtk::Align::FILL);
+    this->box.set_halign(Gtk::Align::FILL);
+
     this->box.append(this->map);
     this->box.append(this->machines);
+
+    this->set_expand(true);
+    this->set_valign(Gtk::Align::FILL);
+    this->set_halign(Gtk::Align::FILL);
 
     this->set_child(this->box);
   }

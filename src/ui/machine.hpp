@@ -45,11 +45,10 @@ protected:
 public:
   explicit MachineSelector() {
     auto add_icon = [this](BuildingType type, Gtk::Image &&img) {
-      this->icons.emplace_back(type,
-                               std::move(img),
+      this->icons.emplace_back(type, std::move(img),
                                this->sig_machine_selected);
     };
-    add_icon(BuildingType::Miner, Gtk::Image {"./assets/miner.png"});
+    add_icon(BuildingType::Miner, Gtk::Image{"./assets/miner.png"});
     add_icon(BuildingType::Cutter, Gtk::Image{"./assets/cutter.png"});
     add_icon(BuildingType::TrashCan, Gtk::Image{"./assets/trashcan.png"});
     add_icon(BuildingType::Belt, Gtk::Image{"./assets/belt.png"});
@@ -57,6 +56,9 @@ public:
     for (auto &icon : this->icons) {
       this->append(icon);
     }
+
+    this->set_hexpand();
+    this->set_halign(Gtk::Align::CENTER);
   }
 
   sigc::signal<void(BuildingType)> signal_machine_selected() {
