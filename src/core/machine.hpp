@@ -1,15 +1,20 @@
 #ifndef SHAPEZX_CORE_MACHINE
 #define SHAPEZX_CORE_MACHINE
 
-#include "../vec/vec.hpp"
 #include "ore.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
 #include <memory>
 #include <optional>
+#include <ranges>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -22,6 +27,8 @@ using std::size_t;
 using std::string;
 using std::unique_ptr;
 using std::vector;
+
+using ssize_t = std::make_signed_t<size_t>;
 
 constexpr int64_t BASIC_EFF = 10;
 
@@ -40,13 +47,10 @@ enum class Direction {
   Right,
 };
 
-template <typename Item> struct Buffer {
-  Item item;
-  size_t num;
+struct Buffer {
+  std::unordered_map<Item, size_t> items;
 
-  Buffer() : num(0) {}
-
-  void clear() { this->num = 0; }
+  void clear() { this->items.clear(); }
 
   Buffer take() {
     auto ret = Buffer(*this);
@@ -54,11 +58,87 @@ template <typename Item> struct Buffer {
 
     return ret;
   }
+
+  size_t get(Item it) const try {
+    return this->items.at(it);
+  } catch (const std::out_of_range &) {
+    return 0;
+  }
+
+  void set(Item it, size_t n) { this->items[it] = n; }
+
+  size_t increase(Item it, ssize_t n) {
+    auto &cur = this->items[it];
+    if (n >= 0 || cur >= size_t(-n)) {
+      cur += n;
+    } else {
+      cur = 0;
+    }
+    return cur;
+  }
+
+  size_t &operator[](Item it) { return this->items[it]; }
+
+  void merge(Buffer &&other) { this->items.merge(std::move(other.items)); }
+
+  bool empty() const {
+    return this->items.empty() ||
+           std::ranges::all_of(
+               this->items, [](const auto &pair) { return pair.second == 0; });
+  }
 };
 
 struct Capability {
-  vector<vec::Vec2<size_t>> positions;
-  Buffer<Item> items;
+  enum Type {
+    None,
+    Any,
+    Custom,
+  };
+
+  Type type;
+  // valid if type == Custom
+  Buffer items;
+
+  static Capability none() { return {.type = None, .items = {}}; }
+  static Capability any() { return {.type = Any, .items = {}}; }
+
+  bool accepts(Item item, size_t q) const {
+    switch (this->type) {
+    case None:
+      return false;
+    case Any:
+      return true;
+    case Custom:
+      return this->items.get(item) >= q;
+    }
+  }
+
+  optional<size_t> num_accepts(Item item) const {
+    switch (this->type) {
+    case None:
+      return false;
+    case Any:
+      return std::nullopt;
+    case Custom:
+      return this->items.get(item);
+    }
+  }
+
+  Capability merge(Capability other) const {
+    switch (this->type) {
+    case None:
+      return Capability::none();
+    case Any:
+      return other;
+    case Custom:
+      auto items = this->items.items;
+      for (auto &[item, val] : items) {
+        val = std::min(val, other.items.get(item));
+      }
+
+      return {.type = Custom, .items = {items}};
+    }
+  }
 };
 
 struct BuildingInfo {
@@ -77,11 +157,8 @@ struct Building {
   virtual BuildingInfo info() const = 0;
   virtual unique_ptr<Building> clone() const = 0;
 
-  virtual Capability input_capabilities(MapAccessor &) const { return {}; }
-  virtual Capability output_capabilities(MapAccessor &) const { return {}; }
-
-  virtual void input(Capability){};
-  virtual Buffer<Item> output(Capability) { return Buffer<Item>(); };
+  virtual void input(MapAccessor &, Buffer &, Capability) {};
+  virtual Buffer output(Capability) { return Buffer(); };
 
   // update internal state by 1 tick
   virtual void update(MapAccessor);
@@ -91,7 +168,7 @@ struct Building {
 
 struct Miner final : public Building {
   BuildingInfo info_;
-  Buffer<Item> ores;
+  Buffer ores;
 
   explicit Miner(Direction direction_)
       : info_(BuildingType::Miner, {1, 1}, direction_) {}
@@ -104,12 +181,12 @@ struct Miner final : public Building {
     return std::make_unique<Miner>(*this);
   }
 
-  Capability output_capabilities(MapAccessor &) const override;
-
-  void input(Capability) override{
-      // todo
+  void input(MapAccessor &, Buffer &, Capability) override {
+    // todo
+    std::unreachable();
   };
-  Buffer<Item> output(Capability) override { return this->ores.take(); }
+
+  Buffer output(Capability) override { return this->ores.take(); }
 
   void update(MapAccessor m) override;
 
@@ -119,6 +196,7 @@ struct Miner final : public Building {
 struct Belt final : public Building {
   BuildingInfo info_;
   std::uint32_t progress = 0;
+  Buffer buffer;
 
   explicit Belt(Direction direction_)
       : info_(BuildingType::Belt, {1, 1}, direction_) {}
@@ -127,6 +205,8 @@ struct Belt final : public Building {
 
   BuildingInfo info() const override { return this->info_; }
 
+  void input(MapAccessor &, Buffer &, Capability) override;
+
   void update(MapAccessor) override;
 
   unique_ptr<Building> clone() const override {
@@ -134,6 +214,22 @@ struct Belt final : public Building {
   }
 
   ~Belt() override = default;
+
+  Capability transport_capability(int64_t efficiency_factor) const {
+    if (this->buffer.empty()) {
+      return Capability::any();
+    }
+
+    return Capability{
+        .type = Capability::Custom,
+        .items = {this->buffer.items |
+                  std::views::transform([=](std::pair<Item, size_t> t) {
+                    return std::make_pair(
+                        t.first,
+                        std::min(size_t(4 * efficiency_factor), t.second));
+                  }) |
+                  std::ranges::to<std::unordered_map<Item, size_t>>()}};
+  }
 };
 
 struct Cutter final : public Building {

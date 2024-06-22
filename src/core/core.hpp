@@ -94,6 +94,10 @@ struct MapAccessor {
     return self.map.get()[self.pos[0], self.pos[1]];
   }
 
+  auto &get_chunk(this auto &&self, vec::Vec2<ssize_t> r) {
+    return self.map.get()[self.relative_pos_by(r)];
+  }
+
   // Returns r + current position .
   vec::Vec2<size_t> relative_pos_by(vec::Vec2<ssize_t> r) {
     return this->pos + r;
@@ -110,7 +114,8 @@ struct State {
 
   State(size_t height, size_t width, size_t seed) : map(height, width, seed) {}
 
-  State(size_t height, size_t width): State(height, width, std::random_device()()) {}
+  State(size_t height, size_t width)
+      : State(height, width, std::random_device()()) {}
 
   State(const Map &&map_, const Context &&ctx_)
       : map(std::move(map_)), ctx(std::move(ctx_)) {}

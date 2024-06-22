@@ -2,7 +2,6 @@
 #include "core.hpp"
 
 #include <array>
-#include <ranges>
 
 namespace shapezx {
 
@@ -34,7 +33,7 @@ constexpr Direction opposite_of(Direction d) {
 
 constexpr Direction right_of(Direction d) { return opposite_of(left_of(d)); }
 
-constexpr std::array<Direction, 4> ALL_DIRECTIONS = {
+[[maybe_unused]] constexpr std::array<Direction, 4> ALL_DIRECTIONS = {
     Direction::Down, Direction::Up, Direction::Left, Direction::Right};
 
 constexpr vec::Vec2<ssize_t> to_vec2(Direction d) {
@@ -56,28 +55,35 @@ void Miner::update(MapAccessor m) {
   const auto &chk = m.current_chunk();
   if (chk.ore) {
     const auto &ore = chk.ore.value();
-    if (this->ores.num == 0) {
-      this->ores.item = ore;
-    }
-    this->ores.num += m.ctx.get().efficiency_factor * 1;
+    this->ores[ore] += m.ctx.get().efficiency_factor * 1;
   }
 }
 
-Capability Miner::output_capabilities(MapAccessor &m) const {
-  return {
-      .positions = std::views::transform(ALL_DIRECTIONS, to_vec2) |
-                   std::views::transform(
-                       [&](const auto d) { return m.relative_pos_by(d); }) |
-                   std::ranges::to<vector>(),
-      .items = {},
-  };
+void Belt::input(MapAccessor &m, Buffer &buf, Capability cap) {
+  cap = cap.merge(this->transport_capability(m.ctx.get().efficiency_factor));
+
+  for (auto &[item, val] : buf.items) {
+    auto accepts = cap.num_accepts(item).value_or(val);
+
+    if (accepts) {
+      val -= accepts;
+      this->buffer.increase(item, accepts);
+    }
+  }
 }
 
-void Belt::update(MapAccessor) {
+void Belt::update(MapAccessor m) {
   this->progress += 10;
   if (this->progress == 100) {
-    // todo
     this->progress = 0;
+    auto &nx = m.get_chunk(to_vec2(this->info_.direction));
+    if (nx.building) {
+      auto &building = nx.building.value();
+      auto capability =
+          this->transport_capability(m.ctx.get().efficiency_factor);
+
+      building->input(m, this->buffer, capability);
+    }
   }
 }
 } // namespace shapezx
