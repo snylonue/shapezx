@@ -16,9 +16,12 @@ struct Item {
   int64_t value;
 };
 
-static const Item IRON{"iron", 30};
+static const Item IRON_ORE{"iron ore", 30};
 static const Item GOLD{"gold", 60};
-static const array<Item, 2> ORES{IRON, GOLD};
+static const array<Item, 2> ORES{IRON_ORE, GOLD};
+
+static const Item IRON{"iron", 40};
+static const Item STONE{"stone", 1};
 } // namespace shapezx
 
 #endif
