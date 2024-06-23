@@ -47,13 +47,17 @@ void Belt::update(MapAccessor m) {
   this->progress += 10;
   if (this->progress == 100) {
     this->progress = 0;
-    auto &nx = m.get_chunk(to_vec2(this->info_.direction));
-    if (nx.building) {
-      auto &building = nx.building.value();
-      auto capability =
-          this->transport_capability(m.ctx.get().efficiency_factor);
+    auto [out_chk, acc] =
+        m.get_chunk_and_accessor(to_vec2(this->info_.direction));
+    if (out_chk.building) {
+      auto &out = out_chk.building.value();
+      if (std::ranges::any_of(out->input_positons(acc),
+                              [&](const auto d) { return d == m.pos; })) {
+        auto capability =
+            this->transport_capability(m.ctx.get().efficiency_factor);
 
-      building->input(m, this->buffer, capability);
+        out->input(m, this->buffer, capability);
+      }
     }
   }
 }
