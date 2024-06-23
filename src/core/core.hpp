@@ -13,6 +13,7 @@
 #include <random>
 #include <span>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace shapezx {
@@ -96,6 +97,12 @@ struct MapAccessor {
 
   auto &get_chunk(this auto &&self, vec::Vec2<ssize_t> r) {
     return self.map.get()[self.relative_pos_by(r)];
+  }
+
+  std::pair<Chunk &, MapAccessor> get_chunk_and_accessor(this auto &&self,
+                                                         vec::Vec2<ssize_t> r) {
+    return {self.map.get()[self.relative_pos_by(r)],
+            MapAccessor(self.pos + r, self.map, self.ctx)};
   }
 
   // Returns r + current position .

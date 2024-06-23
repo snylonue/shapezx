@@ -73,15 +73,18 @@ public:
   }
 
   void reset_label() {
-    this->set_label(std::format("{} at ({} {})",
-                                this->map_accessor.current_chunk()
-                                    .building
-                                    .transform([](auto const &b) {
-                                      return std::format("{}", b->info().type);
-                                    })
-                                    .value_or("none"),
-                                this->map_accessor.pos[0],
-                                this->map_accessor.pos[1]));
+    this->set_label(
+        std::format("{}\nat ({} {})\nwith {}",
+                    this->map_accessor.current_chunk()
+                        .building
+                        .transform([](auto const &b) {
+                          return std::format("{}", b->info().type);
+                        })
+                        .value_or("none"),
+                    this->map_accessor.pos[0], this->map_accessor.pos[1],
+                    this->map_accessor.current_chunk()
+                        .ore.transform([](auto const &ore) { return ore.name; })
+                        .value_or("")));
   }
 };
 
@@ -146,7 +149,7 @@ public:
         }));
 
     this->set_title("shapezx");
-    this->set_default_size(1920, 1080);
+    this->set_default_size(1920 / 4, 1080 / 4);
 
     this->box.set_expand(false);
     // this->box.set_vexpand(true);
@@ -168,7 +171,7 @@ public:
 };
 
 int main(int argc, char **argv) {
-  auto state = shapezx::State(20, 30);
+  auto state = shapezx::State(10, 15);
 
   auto app = Gtk::Application::create();
 

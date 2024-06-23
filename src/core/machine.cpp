@@ -1,53 +1,8 @@
 #include "machine.hpp"
 #include "core.hpp"
-
-#include <array>
+#include <algorithm>
 
 namespace shapezx {
-
-constexpr Direction left_of(Direction d) {
-  switch (d) {
-  case Direction::Left:
-    return Direction::Down;
-  case Direction::Down:
-    return Direction::Right;
-  case Direction::Right:
-    return Direction::Up;
-  case Direction::Up:
-    return Direction::Left;
-  }
-}
-
-constexpr Direction opposite_of(Direction d) {
-  switch (d) {
-  case Direction::Left:
-    return Direction::Right;
-  case Direction::Down:
-    return Direction::Up;
-  case Direction::Right:
-    return Direction::Left;
-  case Direction::Up:
-    return Direction::Down;
-  }
-}
-
-constexpr Direction right_of(Direction d) { return opposite_of(left_of(d)); }
-
-[[maybe_unused]] constexpr std::array<Direction, 4> ALL_DIRECTIONS = {
-    Direction::Down, Direction::Up, Direction::Left, Direction::Right};
-
-constexpr vec::Vec2<ssize_t> to_vec2(Direction d) {
-  switch (d) {
-  case Direction::Left:
-    return {-1, 0};
-  case Direction::Down:
-    return {0, -1};
-  case Direction::Right:
-    return {1, 0};
-  case Direction::Up:
-    return {0, 1};
-  }
-}
 
 void Building::update(MapAccessor) {}
 
@@ -55,8 +10,24 @@ void Miner::update(MapAccessor m) {
   const auto &chk = m.current_chunk();
   if (chk.ore) {
     const auto &ore = chk.ore.value();
-    this->ores[ore] += m.ctx.get().efficiency_factor * 1;
+    this->ores.increase(ore, m.ctx.get().efficiency_factor);
   }
+
+  if (!this->ores.empty()) {
+    auto [out_chk, acc] =
+        m.get_chunk_and_accessor(to_vec2(this->info_.direction));
+    if (out_chk.building) {
+      auto &out = out_chk.building.value();
+      if (std::ranges::any_of(out->input_positons(acc),
+                              [&](const auto d) { return d == m.pos; })) {
+        out->input(m, this->ores, {Capability::Custom, this->ores});
+      }
+    }
+  }
+}
+
+vector<vec::Vec2<size_t>> Belt::input_positons(MapAccessor &m) const {
+  return {m.relative_pos_by(to_vec2(opposite_of(this->info_.direction)))};
 }
 
 void Belt::input(MapAccessor &m, Buffer &buf, Capability cap) {

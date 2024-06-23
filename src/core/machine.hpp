@@ -1,6 +1,7 @@
 #ifndef SHAPEZX_CORE_MACHINE
 #define SHAPEZX_CORE_MACHINE
 
+#include "../vec/vec.hpp"
 #include "ore.hpp"
 
 #include <algorithm>
@@ -47,6 +48,50 @@ enum class Direction {
   Right,
 };
 
+constexpr Direction left_of(Direction d) {
+  switch (d) {
+  case Direction::Left:
+    return Direction::Down;
+  case Direction::Down:
+    return Direction::Right;
+  case Direction::Right:
+    return Direction::Up;
+  case Direction::Up:
+    return Direction::Left;
+  }
+}
+
+constexpr Direction opposite_of(Direction d) {
+  switch (d) {
+  case Direction::Left:
+    return Direction::Right;
+  case Direction::Down:
+    return Direction::Up;
+  case Direction::Right:
+    return Direction::Left;
+  case Direction::Up:
+    return Direction::Down;
+  }
+}
+
+constexpr Direction right_of(Direction d) { return opposite_of(left_of(d)); }
+
+[[maybe_unused]] constexpr std::array<Direction, 4> ALL_DIRECTIONS = {
+    Direction::Down, Direction::Up, Direction::Left, Direction::Right};
+
+constexpr vec::Vec2<ssize_t> to_vec2(Direction d) {
+  switch (d) {
+  case Direction::Left:
+    return {0, -1};
+  case Direction::Down:
+    return {1, 0};
+  case Direction::Right:
+    return {0, 1};
+  case Direction::Up:
+    return {-1, 0};
+  }
+}
+
 struct Buffer {
   std::unordered_map<Item, size_t> items;
 
@@ -79,6 +124,7 @@ struct Buffer {
 
   size_t &operator[](Item it) { return this->items[it]; }
 
+  void merge(Buffer &other) { this->items.merge(other.items); }
   void merge(Buffer &&other) { this->items.merge(std::move(other.items)); }
 
   bool empty() const {
@@ -131,12 +177,13 @@ struct Capability {
     case Any:
       return other;
     case Custom:
-      auto items = this->items.items;
-      for (auto &[item, val] : items) {
-        val = std::min(val, other.items.get(item));
+      auto items = this->items;
+      for (const auto &[item, val] : other.items.items) {
+        auto num = std::min(val, items.get(item));
+        items[item] = num;
       }
 
-      return {.type = Custom, .items = {items}};
+      return {.type = Custom, .items = items};
     }
   }
 };
@@ -158,7 +205,10 @@ struct Building {
   virtual unique_ptr<Building> clone() const = 0;
 
   virtual void input(MapAccessor &, Buffer &, Capability) {};
-  virtual Buffer output(Capability) { return Buffer(); };
+  virtual vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const {
+    return {};
+  };
+  // virtual Buffer output(MapAccessor &, Capability) { return Buffer(); };
 
   // update internal state by 1 tick
   virtual void update(MapAccessor);
@@ -181,13 +231,6 @@ struct Miner final : public Building {
     return std::make_unique<Miner>(*this);
   }
 
-  void input(MapAccessor &, Buffer &, Capability) override {
-    // todo
-    std::unreachable();
-  };
-
-  Buffer output(Capability) override { return this->ores.take(); }
-
   void update(MapAccessor m) override;
 
   ~Miner() override = default;
@@ -206,6 +249,8 @@ struct Belt final : public Building {
   BuildingInfo info() const override { return this->info_; }
 
   void input(MapAccessor &, Buffer &, Capability) override;
+
+  vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const override;
 
   void update(MapAccessor) override;
 

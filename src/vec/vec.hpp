@@ -28,17 +28,21 @@ template <Arithmetic T = std::size_t> struct Vec2 {
   Vec2() = delete;
   Vec2(const T a1, const T a2) : data({a1, a2}) {}
 
-  auto&& operator[](this auto&& self, std::integral auto i) {
+  auto &&operator[](this auto &&self, std::integral auto i) {
     return self.data.at(i);
   }
 
-  template<typename U = T>
-  Vec2<T> operator+(const Vec2<U> &rhs) const requires Arithmetic<T, U> {
+  template <typename U = T>
+  Vec2<T> operator+(const Vec2<U> &rhs) const
+    requires Arithmetic<T, U>
+  {
     return {this->data[0] + rhs.data[0], this->data[1] + rhs.data[1]};
   }
 
-  template<typename U = T>
-  Vec2<T> operator-(const Vec2<U> &rhs) const requires Arithmetic<T, U> {
+  template <typename U = T>
+  Vec2<T> operator-(const Vec2<U> &rhs) const
+    requires Arithmetic<T, U>
+  {
     return {this->data[0] - rhs.data[0], this->data[1] - rhs.data[1]};
   }
 
@@ -56,10 +60,14 @@ template <Arithmetic T = std::size_t> struct Vec2 {
     return {this->data[0] / rhs, this->data[1] / rhs};
   }
 
-  template<typename U = T>
-  T operator*(const Vec2 &rhs) const requires Arithmetic<T, U> {
+  template <typename U = T>
+  T operator*(const Vec2 &rhs) const
+    requires Arithmetic<T, U>
+  {
     return this->data[0] * rhs.data[0] + this->data[1] * rhs.data[1];
   }
+
+  bool operator==(const Vec2 &rhs) const { return this->data == rhs.data; }
 };
 } // namespace shapezx::vec
 
