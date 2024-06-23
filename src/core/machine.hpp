@@ -208,7 +208,6 @@ struct Building {
   virtual vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const {
     return {};
   };
-  // virtual Buffer output(MapAccessor &, Capability) { return Buffer(); };
 
   // update internal state by 1 tick
   virtual void update(MapAccessor);
@@ -303,6 +302,10 @@ struct TrashCan final : public Building {
   TrashCan(const TrashCan &) = default;
 
   BuildingInfo info() const override { return this->info_; }
+
+  void input(MapAccessor &, Buffer &, Capability) override;
+
+  vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const override;
 
   unique_ptr<Building> clone() const override {
     return std::make_unique<TrashCan>(*this);

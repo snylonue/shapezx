@@ -57,4 +57,21 @@ void Belt::update(MapAccessor m) {
     }
   }
 }
+
+vector<vec::Vec2<size_t>> TrashCan::input_positons(MapAccessor &m) const {
+  return std::views::transform(ALL_DIRECTIONS, to_vec2) |
+         std::views::transform(
+             [&](const auto d) { return m.relative_pos_by(d); }) |
+         std::ranges::to<vector>();
+}
+
+void TrashCan::input(MapAccessor &, Buffer &buf, Capability cap) {
+  for (auto &[item, val] : buf.items) {
+    auto accepts = cap.num_accepts(item).value_or(val);
+
+    if (accepts) {
+      val -= accepts;
+    }
+  }
+}
 } // namespace shapezx
