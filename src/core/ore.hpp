@@ -17,6 +17,10 @@ struct Item {
   int64_t value;
 
   bool operator==(const Item &) const = default;
+  bool operator<(const Item &other) const {
+    return (this->name == other.name) ? this->name < other.name
+                                      : this->value < other.value;
+  };
 };
 
 static const Item IRON_ORE{"iron ore", 30};

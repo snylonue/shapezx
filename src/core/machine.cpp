@@ -20,7 +20,7 @@ void Miner::update(MapAccessor m) {
       auto &out = out_chk.building.value();
       if (std::ranges::any_of(out->input_positons(acc),
                               [&](const auto d) { return d == m.pos; })) {
-        out->input(m, this->ores, {Capability::Custom, this->ores});
+        out->input(m, this->ores, Capability::custom(this->ores));
       }
     }
   }
@@ -61,6 +61,12 @@ void Belt::update(MapAccessor m) {
     }
   }
 }
+
+vector<vec::Vec2<size_t>> Cutter::input_positons(MapAccessor &m) const {
+  return {m.relative_pos_by(to_vec2(this->info_.direction))};
+}
+
+void Cutter::input(MapAccessor &m, Buffer &buf, Capability cap) {}
 
 vector<vec::Vec2<size_t>> TrashCan::input_positons(MapAccessor &m) const {
   return std::views::transform(ALL_DIRECTIONS, to_vec2) |

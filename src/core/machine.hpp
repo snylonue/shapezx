@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -17,6 +18,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace shapezx {
@@ -135,56 +137,121 @@ struct Buffer {
 };
 
 struct Capability {
-  enum Type {
-    None,
-    Any,
-    Custom,
+  struct None {
+    std::monostate inner;
   };
 
-  Type type;
-  // valid if type == Custom
-  Buffer items;
+  struct Any {
+    std::monostate inner;
+  };
 
-  static Capability none() { return {.type = None, .items = {}}; }
-  static Capability any() { return {.type = Any, .items = {}}; }
+  struct Specific;
 
-  bool accepts(Item item, size_t q) const {
-    switch (this->type) {
-    case None:
-      return false;
-    case Any:
-      return true;
-    case Custom:
-      return this->items.get(item) >= q;
-    }
-  }
+  struct Custom {
+    Buffer inner;
 
-  optional<size_t> num_accepts(Item item) const {
-    switch (this->type) {
-    case None:
-      return false;
-    case Any:
-      return std::nullopt;
-    case Custom:
-      return this->items.get(item);
-    }
-  }
-
-  Capability merge(Capability other) const {
-    switch (this->type) {
-    case None:
-      return Capability::none();
-    case Any:
-      return other;
-    case Custom:
-      auto items = this->items;
-      for (const auto &[item, val] : other.items.items) {
+    Capability merge(const Custom &oc) const {
+      auto items = this->inner;
+      for (const auto &[item, val] : oc.inner.items) {
         auto num = std::min(val, items.get(item));
         items[item] = num;
       }
-
-      return {.type = Custom, .items = items};
+      return Capability{.restriction = Custom{.inner = items}};
     }
+
+    Capability merge(const Specific &oc) const {
+      auto items = this->inner.items |
+                   std::views::filter([&](const pair<Item, size_t> entry) {
+                     auto const &inner = oc.inner;
+                     return std::find(inner.cbegin(), inner.cend(),
+                                      entry.first) != inner.cend();
+                   }) |
+                   std::ranges::to<std::unordered_map<Item, size_t>>();
+      return Capability{.restriction = Custom{.inner = Buffer(items)}};
+    }
+  };
+
+  struct Specific {
+    vector<Item> inner;
+
+    Capability merge(const Custom &oc) const { return oc.merge(*this); }
+
+    Capability merge(const Specific &oc) const {
+      auto items1 = this->inner;
+      auto items2 = oc.inner;
+
+      std::sort(items1.begin(), items1.end());
+      std::sort(items1.begin(), items1.end());
+
+      vector<Item> res;
+      std::set_intersection(items1.begin(), items1.end(), items2.begin(),
+                            items2.end(), std::back_inserter(res));
+
+      return Capability{.restriction = Specific{.inner = res}};
+    }
+  };
+
+  template <class... Ts> struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+
+  std::variant<None, Any, Custom, Specific> restriction;
+
+  static Capability none() { return {.restriction = None()}; }
+  static Capability any() { return {.restriction = Any()}; }
+  static Capability custom(const Buffer &buf) {
+    return {.restriction = Custom(buf)};
+  }
+
+  template <typename S> auto &get() {
+    return std::get<S>(this->restriction).inner;
+  }
+
+  template <typename S> const auto &get() const {
+    return std::get<S>(this->restriction).inner;
+  }
+
+  bool accepts(Item item, size_t q) const {
+    return this->num_accepts(item)
+        .transform([=](auto const val) { return val >= q; })
+        .value_or(true);
+  }
+
+  optional<size_t> num_accepts(Item item) const {
+    return std::visit(
+        overloaded{[](None) { return optional<size_t>{0}; },
+                   [](Any) { return optional<size_t>{}; },
+                   [&](const Custom &c) { return optional(c.inner.get(item)); },
+                   [&](const Specific &s) {
+                     if (std::find(s.inner.cbegin(), s.inner.cend(), item) !=
+                         s.inner.cend()) {
+                       return optional<size_t>{};
+                     } else {
+                       return optional<size_t>{0};
+                     }
+                   }},
+        this->restriction);
+  }
+
+  Capability merge(Capability other) const {
+    return std::visit(
+        overloaded{
+            [](None) { return Capability::none(); }, [=](Any) { return other; },
+            [&](const Custom &c) {
+              return std::visit(
+                  overloaded{[](None) { return Capability::none(); },
+                             [this](Any) { return *this; },
+                             [&](auto const &oc) { return c.merge(oc); }},
+                  other.restriction);
+            },
+            [&](const Specific &s) {
+              return std::visit(
+                  overloaded{[](None) { return Capability::none(); },
+                             [this](Any) { return *this; },
+                             [&](auto const &oc) { return s.merge(oc); }},
+                  other.restriction);
+            }},
+        this->restriction);
   }
 };
 
@@ -264,15 +331,13 @@ struct Belt final : public Building {
       return Capability::any();
     }
 
-    return Capability{
-        .type = Capability::Custom,
-        .items = {this->buffer.items |
-                  std::views::transform([=](std::pair<Item, size_t> t) {
-                    return std::make_pair(
-                        t.first,
-                        std::min(size_t(4 * efficiency_factor), t.second));
-                  }) |
-                  std::ranges::to<std::unordered_map<Item, size_t>>()}};
+    return Capability::custom(Buffer(
+        this->buffer.items |
+        std::views::transform([=](std::pair<Item, size_t> t) {
+          return std::make_pair(
+              t.first, std::min(size_t(4 * efficiency_factor), t.second));
+        }) |
+        std::ranges::to<std::unordered_map<Item, size_t>>()));
   }
 };
 
@@ -285,6 +350,10 @@ struct Cutter final : public Building {
   Cutter(const Cutter &) = default;
 
   BuildingInfo info() const override { return this->info_; }
+
+  vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const override;
+
+  void input(MapAccessor &, Buffer &, Capability) override;
 
   unique_ptr<Building> clone() const override {
     return std::make_unique<Cutter>(*this);
