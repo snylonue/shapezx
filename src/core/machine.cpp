@@ -44,6 +44,7 @@ void Belt::input(MapAccessor &m, Buffer &buf, Capability cap) {
 }
 
 void Belt::update(MapAccessor m) {
+  if (!this->buffer.empty()) {
   this->progress += 10;
   if (this->progress == 100) {
     this->progress = 0;
@@ -57,6 +58,7 @@ void Belt::update(MapAccessor m) {
             this->transport_capability(m.ctx.get().efficiency_factor);
 
         out->input(m, this->buffer, capability);
+        }
       }
     }
   }
