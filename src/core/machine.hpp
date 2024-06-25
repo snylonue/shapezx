@@ -202,6 +202,9 @@ struct Capability {
   static Capability custom(const Buffer &buf) {
     return {.restriction = Custom(buf)};
   }
+  static Capability specific(const vector<Item> &items) {
+    return {.restriction = Specific(items)};
+  }
 
   template <typename S> auto &get() {
     return std::get<S>(this->restriction).inner;
@@ -343,6 +346,8 @@ struct Belt final : public Building {
 
 struct Cutter final : public Building {
   BuildingInfo info_;
+  Buffer in;
+  Buffer out;
 
   explicit Cutter(Direction direction_)
       : info_(BuildingType::Cutter, {2, 1}, direction_) {}
@@ -353,7 +358,13 @@ struct Cutter final : public Building {
 
   vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const override;
 
+  Capability transport_capability() const {
+    return Capability::specific({IRON_ORE});
+  }
+
   void input(MapAccessor &, Buffer &, Capability) override;
+
+  void update(MapAccessor) override;
 
   unique_ptr<Building> clone() const override {
     return std::make_unique<Cutter>(*this);
