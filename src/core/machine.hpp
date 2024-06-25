@@ -417,6 +417,19 @@ template <> struct std::formatter<shapezx::BuildingType> {
     }
   }
 };
+
+template <> struct std::formatter<shapezx::Buffer> {
+  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+
+  auto format(const shapezx::Buffer &buf, std::format_context &ctx) const {
+    std::format_to(ctx.out(), "{{\n");
+    for (auto [item, num] : buf.items) {
+      std::format_to(ctx.out(), "{}: {}\n", item.name, num);
+    }
+
+    return std::format_to(ctx.out(), "}}");
+  }
+};
 } // namespace std
 
 #endif
