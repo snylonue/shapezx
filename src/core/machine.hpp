@@ -279,6 +279,15 @@ struct Building {
     return {};
   };
 
+  // INVARIANCE: chunks in relative_rect() either have placeholder or have no
+  // building
+  virtual pair<vec::Vec2<ssize_t>, vec::Vec2<ssize_t>> relative_rect() const {
+    auto size = this->info().size;
+    auto d = this->info().direction;
+    return {to_vec2(right_of(d)) * static_cast<ssize_t>(size.first),
+            to_vec2(opposite_of(d)) * static_cast<ssize_t>(size.second)};
+  }
+
   // update internal state by 1 tick
   virtual void update(MapAccessor);
 
@@ -392,6 +401,22 @@ struct TrashCan final : public Building {
   }
 
   ~TrashCan() override = default;
+};
+
+struct PlaceHolder final : public Building {
+  BuildingInfo info_;
+  vec::Vec2<> base_;
+
+  explicit PlaceHolder(Direction direction_, vec::Vec2<> base)
+      : info_(BuildingType::PlaceHolder, {1, 1}, direction_), base_(base) {}
+
+  BuildingInfo info() const override { return this->info_; }
+
+  unique_ptr<Building> clone() const override {
+    return std::make_unique<PlaceHolder>(*this);
+  }
+
+  ~PlaceHolder() = default;
 };
 
 } // namespace shapezx
