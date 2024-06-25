@@ -1,20 +1,26 @@
 #include "machine.hpp"
 #include "core.hpp"
 #include "ore.hpp"
+
 #include <algorithm>
 
 namespace shapezx {
 
-void output_to(MapAccessor m, vec::Vec2<ssize_t> at, Buffer &buf,
-               Capability cap) {
+void output_to(MapAccessor m, vec::Vec2<ssize_t> at, vec::Vec2<> from,
+               Buffer &buf, Capability cap) {
   auto [out_chk, acc] = m.get_chunk_and_accessor(at);
   if (out_chk.building) {
     auto &out = out_chk.building.value();
     if (std::ranges::any_of(out->input_positons(acc),
-                            [&](const auto d) { return d == m.pos; })) {
+                            [=](const auto d) { return d == from; })) {
       out->input(acc, buf, cap);
     }
   }
+}
+
+void output_to(MapAccessor m, vec::Vec2<ssize_t> at, Buffer &buf,
+               Capability cap) {
+  output_to(m, at, m.pos, buf, cap);
 }
 
 void consume(Buffer &from, Buffer &to, Capability cap) {
@@ -69,7 +75,7 @@ vector<vec::Vec2<size_t>> Cutter::input_positons(MapAccessor &m) const {
   return {m.relative_pos_by(to_vec2(this->info_.direction))};
 }
 
-void Cutter::input(MapAccessor &m, Buffer &buf, Capability cap) {
+void Cutter::input(MapAccessor &, Buffer &buf, Capability cap) {
   cap = cap.merge(this->transport_capability());
 
   consume(buf, this->in, cap);
@@ -83,13 +89,14 @@ void Cutter::update(MapAccessor m) {
   }
 
   if (!this->out.empty()) {
-    output_to(m, to_vec2(opposite_of(this->info_.direction)), this->out,
-              Capability::specific({IRON}));
+    auto d = this->info_.direction;
+    auto select = [this](Item item) {
+      return Capability::custom({.items = {{item, this->out.get(item)}}});
+    };
 
-    output_to(m,
-              to_vec2(opposite_of(this->info_.direction)) +
-                  to_vec2(right_of(this->info_.direction)),
-              this->out, Capability::specific({STONE}));
+    output_to(m, to_vec2(opposite_of(d)), this->out, select(IRON));
+    output_to(m, to_vec2(opposite_of(d)) + to_vec2(right_of(d)),
+              m.pos + to_vec2(right_of(d)), this->out, select(STONE));
   }
 }
 

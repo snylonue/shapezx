@@ -78,7 +78,7 @@ constexpr Direction opposite_of(Direction d) {
 
 constexpr Direction right_of(Direction d) { return opposite_of(left_of(d)); }
 
-[[maybe_unused]] constexpr std::array<Direction, 4> ALL_DIRECTIONS = {
+constexpr std::array<Direction, 4> ALL_DIRECTIONS = {
     Direction::Down, Direction::Up, Direction::Left, Direction::Right};
 
 constexpr vec::Vec2<ssize_t> to_vec2(Direction d) {
