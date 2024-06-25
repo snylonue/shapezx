@@ -13,13 +13,13 @@ void Chunk::update(MapAccessor m) {
 }
 
 void Map::update(Context &ctx) {
-  for (auto const [r, row] : this->chunks | std::ranges::views::chunk(this->width) |
-                           std::ranges::views::enumerate) {
+  for (auto const [r, row] : this->chunks |
+                                 std::ranges::views::chunk(this->width) |
+                                 std::ranges::views::enumerate) {
     for (auto const [c, chunk] : row | std::ranges::views::enumerate) {
       auto acc = MapAccessor(vec::Vec2<>(r, c), *this, ctx);
       chunk.update(acc);
     }
   }
 }
-
 } // namespace shapezx

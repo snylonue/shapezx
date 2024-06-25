@@ -7,10 +7,12 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <random>
+#include <ranges>
 #include <span>
 #include <type_traits>
 #include <utility>
@@ -76,10 +78,6 @@ struct Map {
     return self[pos[0], pos[1]];
   }
 
-  void add_machine(vec::Vec2<std::size_t> pos, unique_ptr<Building> &&machine) {
-    (*this)[pos].building = std::make_optional(std::move(machine));
-  }
-
   void update(Context &ctx);
 };
 
@@ -110,8 +108,38 @@ struct MapAccessor {
     return this->pos + r;
   }
 
-  void add_machine(std::unique_ptr<shapezx::Building> &&machine) {
-    this->map.get().add_machine(this->pos, std::move(machine));
+  // returns modified chunks
+  vector<vec::Vec2<>>
+  add_machine(std::unique_ptr<shapezx::Building> &&machine) {
+    auto &m = this->map.get();
+    auto rect = machine->relative_rect();
+    vector<vec::Vec2<>> res{this->pos};
+    if (!m[this->pos].building) {
+      auto iota_ = [](ssize_t f, ssize_t t) {
+        ssize_t distence = (f < t) ? t - f : f - t;
+        ssize_t sign = (f <= t) ? 1 : -1;
+        return std::views::iota(0, distence) |
+               std::views::transform([=](ssize_t d) { return f + d * sign; });
+      };
+
+      auto view =
+          std::views::cartesian_product(iota_(0, rect[0]), iota_(0, rect[1])) |
+          std::views::filter(
+              [](auto const v) { return std::get<0>(v) || std::get<1>(v); });
+      for (auto [r, c] : view) {
+        auto [chk, acc] = this->get_chunk_and_accessor({r, c});
+        res.push_back(acc.pos);
+        if (chk.building) {
+          throw std::exception();
+        }
+        chk.building =
+            std::make_unique<PlaceHolder>(machine->info().direction, this->pos);
+      }
+
+      m[pos].building = std::make_optional(std::move(machine));
+    }
+
+    return res;
   }
 };
 

@@ -279,13 +279,13 @@ struct Building {
     return {};
   };
 
-  // INVARIANCE: chunks in relative_rect() either have placeholder or have no
-  // building
-  virtual pair<vec::Vec2<ssize_t>, vec::Vec2<ssize_t>> relative_rect() const {
+  // INVARIANCE: chunks bewteen (0, 0) and relative_rect() either have placeholder or
+  // have no building
+  virtual vec::Vec2<ssize_t> relative_rect() const {
     auto size = this->info().size;
     auto d = this->info().direction;
-    return {to_vec2(right_of(d)) * static_cast<ssize_t>(size.first),
-            to_vec2(opposite_of(d)) * static_cast<ssize_t>(size.second)};
+    return to_vec2(right_of(d)) * static_cast<ssize_t>(size.first) +
+           to_vec2(opposite_of(d)) * static_cast<ssize_t>(size.second);
   }
 
   // update internal state by 1 tick

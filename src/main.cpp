@@ -28,10 +28,23 @@ struct UIState {
   std::optional<shapezx::BuildingType> machine_selected = std::nullopt;
 };
 
+struct Connections {
+  std::vector<sigc::connection> conns;
+
+  void add(sigc::connection &&conn) { conns.push_back(std::move(conn)); }
+
+  ~Connections() {
+    for (auto &conn : this->conns) {
+      conn.disconnect();
+    }
+  }
+};
+
 class Chunk : public Gtk::Button {
 public:
   shapezx::MapAccessor map_accessor;
   std::reference_wrapper<const UIState> ui_state;
+  sigc::signal<void(std::vector<shapezx::vec::Vec2<>>)> machine_placed;
 
   explicit Chunk(shapezx::MapAccessor current_chunk_, const UIState &ui_state)
       : map_accessor(current_chunk_), ui_state(ui_state) {
@@ -49,11 +62,11 @@ public:
       switch (*placing) {
       case shapezx::BuildingType::Miner:
         machine =
-            shapezx::Building::create<shapezx::Miner>(shapezx::Direction::Down);
+            shapezx::Building::create<shapezx::Miner>(shapezx::Direction::Up);
         break;
       case shapezx::BuildingType::Belt:
         machine =
-            shapezx::Building::create<shapezx::Belt>(shapezx::Direction::Down);
+            shapezx::Building::create<shapezx::Belt>(shapezx::Direction::Up);
         break;
       case shapezx::BuildingType::Cutter:
         machine = shapezx::Building::create<shapezx::Cutter>(
@@ -67,8 +80,8 @@ public:
         return;
       }
 
-      this->map_accessor.add_machine(std::move(machine));
-      this->reset_label();
+      auto modified = this->map_accessor.add_machine(std::move(machine));
+      this->machine_placed.emit(modified);
     }
   }
 
@@ -86,11 +99,17 @@ public:
                         .ore.transform([](auto const &ore) { return ore.name; })
                         .value_or("")));
   }
+
+  sigc::signal<void(std::vector<shapezx::vec::Vec2<>>)>
+  signal_machine_placed() const {
+    return this->machine_placed;
+  }
 };
 
 class Map : public Gtk::Grid {
 public:
   std::vector<Chunk> chunks;
+  Connections conns;
 
   explicit Map(const UIState &ui_state, shapezx::State &game_state) {
     this->set_expand(true);
@@ -103,20 +122,15 @@ public:
            std::views::iota(std::size_t(0), game_state.map.width)) {
         auto &chunk = this->chunks.emplace_back(
             game_state.create_accessor_at({r, c}), ui_state);
+        conns.add(chunk.signal_machine_placed().connect(
+            [&, width =
+                    game_state.map.width](std::vector<shapezx::vec::Vec2<>> v) {
+              for (auto chk : v) {
+                this->chunks[chk[0] * width + chk[1]].reset_label();
+              }
+            }));
         this->attach(chunk, c, r);
       }
-    }
-  }
-};
-
-struct Connections {
-  std::vector<sigc::connection> conns;
-
-  void add(sigc::connection &&conn) { conns.push_back(std::move(conn)); }
-
-  ~Connections() {
-    for (auto &conn : this->conns) {
-      conn.disconnect();
     }
   }
 };
