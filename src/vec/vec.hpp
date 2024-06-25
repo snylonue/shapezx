@@ -4,6 +4,7 @@
 #include <array>
 #include <concepts>
 #include <cstddef>
+#include <format>
 
 namespace shapezx::vec {
 
@@ -70,5 +71,16 @@ template <Arithmetic T = std::size_t> struct Vec2 {
   bool operator==(const Vec2 &rhs) const { return this->data == rhs.data; }
 };
 } // namespace shapezx::vec
+
+namespace std {
+template <typename T> struct std::formatter<shapezx::vec::Vec2<T>> {
+  constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
+
+  auto format(const shapezx::vec::Vec2<T> &v, std::format_context &ctx) const {
+    return std::format_to(ctx.out(), "({}, {})", v[0], v[1]);
+  }
+};
+
+} // namespace std
 
 #endif
