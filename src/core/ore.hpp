@@ -31,10 +31,12 @@ static const Item IRON{"iron", 40};
 static const Item STONE{"stone", 1};
 } // namespace shapezx
 
+namespace std {
 template <> struct std::hash<shapezx::Item> {
   std::size_t operator()(const shapezx::Item &item) const noexcept {
     return std::hash<std::string>{}(item.name);
   }
 };
+} // namespace std
 
 #endif

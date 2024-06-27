@@ -3,16 +3,23 @@
 #include "ore.hpp"
 
 #include <algorithm>
+#include <format>
+#include <iostream>
 
 namespace shapezx {
 
 void output_to(MapAccessor m, vec::Vec2<ssize_t> at, vec::Vec2<> from,
                Buffer &buf, Capability cap) {
   auto [out_chk, acc] = m.get_chunk_and_accessor(at);
+  std::cout << std::format("{}\n", acc.pos);
   if (out_chk.building) {
     auto &out = out_chk.building.value();
-    if (std::ranges::any_of(out->input_positons(acc),
-                            [=](const auto d) { return d == from; })) {
+    std::cout << std::format("{}\n", out->info().type);
+    if (std::ranges::any_of(out->input_positons(acc), [=](const auto d) {
+          std::cout << std::format("{}\n", d);
+          return d == from;
+        })) {
+      std::cout << "ok?\n";
       out->input(acc, buf, cap);
     }
   }
@@ -44,6 +51,7 @@ void Miner::update(MapAccessor m) {
   }
 
   if (!this->ores.empty()) {
+    std::cout << std::format("miner: {}\n", this->ores);
     output_to(m, to_vec2(this->info_.direction), this->ores,
               Capability::custom(this->ores));
   }
@@ -61,6 +69,8 @@ void Belt::input(MapAccessor &m, Buffer &buf, Capability cap) {
 
 void Belt::update(MapAccessor m) {
   if (!this->buffer.empty()) {
+    std::cout << std::format("belt: {}\n", this->buffer);
+
     this->progress += 10;
     if (this->progress == 100) {
       this->progress = 0;
@@ -110,5 +120,35 @@ vector<vec::Vec2<size_t>> TrashCan::input_positons(MapAccessor &m) const {
 void TrashCan::input(MapAccessor &, Buffer &buf, Capability cap) {
   Buffer tmp;
   consume(buf, tmp, cap);
+}
+
+void PlaceHolder::input(MapAccessor &m, Buffer &buf, Capability cap) {
+  auto acc = m.relocate(this->pos_);
+  return this->base_->input(acc, buf, cap);
+}
+
+vector<vec::Vec2<size_t>> PlaceHolder::input_positons(MapAccessor &m) const {
+  auto acc = m.relocate(this->pos_);
+  return this->base_->input_positons(acc);
+}
+
+void TaskCenter::input(MapAccessor &, Buffer &buf, Capability cap) {
+  for (auto &[item, val] : buf.items) {
+    auto accepts = cap.num_accepts(item).value_or(val);
+
+    if (accepts) {
+      val -= accepts;
+      this->ctx_.get().take_item(item, accepts);
+    }
+  }
+}
+
+vector<vec::Vec2<size_t>> TaskCenter::input_positons(MapAccessor &m) const {
+  std::cout << std::format("tc pos: {}\n", m.pos);
+  return vector<vec::Vec2<ssize_t>>{{-1, 0}, {-1, 1}, {0, 2},  {1, 2},
+                                    {2, 0},  {2, 1},  {0, -1}, {1, -1}} |
+         std::views::transform(
+             [&](const auto d) { return m.relative_pos_by(d); }) |
+         std::ranges::to<vector>();
 }
 } // namespace shapezx

@@ -7,6 +7,7 @@
 #include <gtkmm/image.h>
 #include <gtkmm/listbox.h>
 #include <gtkmm/listboxrow.h>
+#include <optional>
 #include <sigc++/signal.h>
 
 #include <string>
@@ -16,7 +17,8 @@
 namespace shapezx::ui {
 
 struct UIState {
-  std::optional<shapezx::BuildingType> machine_selected = std::nullopt;
+  std::optional<BuildingType> machine_selected = std::nullopt;
+  std::optional<Direction> direction = std::nullopt;
   bool machine_removing = false;
 };
 
@@ -55,6 +57,7 @@ public:
     add_icon(BuildingType::Cutter, Gtk::Image{"./assets/cutter.png"});
     add_icon(BuildingType::TrashCan, Gtk::Image{"./assets/trashcan.png"});
     add_icon(BuildingType::Belt, Gtk::Image{"./assets/belt.png"});
+    add_icon(BuildingType::TaskCenter, Gtk::Image{"./assets/task_center.png"});
 
     this->remove.set_child(this->remove_icon);
 

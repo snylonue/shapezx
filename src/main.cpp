@@ -101,6 +101,10 @@ public:
         machine = shapezx::Building::create<shapezx::TrashCan>(
             shapezx::Direction::Down);
         break;
+      case shapezx::BuildingType::TaskCenter:
+        machine = shapezx::Building::create<shapezx::TaskCenter>(
+            this->map_accessor.ctx.get());
+        break;
       default:
         return;
       }

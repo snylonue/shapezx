@@ -8,7 +8,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <format>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <random>
@@ -30,6 +32,10 @@ using ssize_t = std::make_signed_t<size_t>;
 
 struct Context {
   std::int32_t efficiency_factor = 1;
+
+  void take_item(const Item &item, size_t num) {
+    std::cout << std::format("take {} {}\n", num, item.name);
+  }
 };
 
 struct Chunk {
@@ -97,6 +103,10 @@ struct MapAccessor {
     return self.map.get()[self.relative_pos_by(r)];
   }
 
+  MapAccessor relocate(vec::Vec2<> p) const {
+    return {p, this->map, this->ctx};
+  }
+
   std::pair<Chunk &, MapAccessor> get_chunk_and_accessor(this auto &&self,
                                                          vec::Vec2<ssize_t> r) {
     return {self.map.get()[self.relative_pos_by(r)],
@@ -115,16 +125,14 @@ struct MapAccessor {
     auto rect = machine->relative_rect();
     vector<vec::Vec2<>> res{this->pos};
     if (!m[this->pos].building) {
-      for (auto [r, c] : rect_iter(rect) | std::views::filter([](auto const v) {
-                           return std::get<0>(v) || std::get<1>(v);
-                         })) {
+      for (auto [r, c] : rect_iter(rect) | std::views::drop(1)) {
         auto [chk, acc] = this->get_chunk_and_accessor({r, c});
         res.push_back(acc.pos);
         if (chk.building) {
           throw std::exception();
         }
-        chk.building =
-            std::make_unique<PlaceHolder>(machine->info().direction, this->pos);
+        chk.building = std::make_unique<PlaceHolder>(machine->info().direction,
+                                                     machine.get(), this->pos);
       }
 
       m[pos].building = std::make_optional(std::move(machine));
@@ -136,7 +144,7 @@ struct MapAccessor {
   vector<vec::Vec2<>> remove_machine() {
     auto &machine = this->current_chunk().building.value();
     auto rect = machine->relative_rect();
-    vector<vec::Vec2<>> res; 
+    vector<vec::Vec2<>> res;
     for (auto [r, c] : rect_iter(rect)) {
       auto [chk, acc] = this->get_chunk_and_accessor({r, c});
       res.push_back(acc.pos);

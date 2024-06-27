@@ -268,8 +268,9 @@ struct BuildingInfo {
 struct MapAccessor;
 
 struct Building {
-  template <typename T> static unique_ptr<Building> create(Direction d) {
-    return std::make_unique<T>(d);
+  template <typename T, typename... Args>
+  static unique_ptr<Building> create(Args &&...args) {
+    return std::make_unique<T>(std::forward<Args>(args)...);
   }
 
   virtual BuildingInfo info() const = 0;
@@ -416,12 +417,18 @@ struct TrashCan final : public Building {
 
 struct PlaceHolder final : public Building {
   BuildingInfo info_;
-  vec::Vec2<> base_;
+  Building *base_; // main document lifetime requirement
+  vec::Vec2<> pos_;
 
-  explicit PlaceHolder(Direction direction_, vec::Vec2<> base)
-      : info_(BuildingType::PlaceHolder, {1, 1}, direction_), base_(base) {}
+  explicit PlaceHolder(Direction direction_, Building *base, vec::Vec2<> pos)
+      : info_(BuildingType::PlaceHolder, {1, 1}, direction_), base_(base),
+        pos_(pos) {}
 
   BuildingInfo info() const override { return this->info_; }
+
+  void input(MapAccessor &m, Buffer &buf, Capability cap) override;
+
+  vector<vec::Vec2<size_t>> input_positons(MapAccessor &m) const override;
 
   unique_ptr<Building> clone() const override {
     return std::make_unique<PlaceHolder>(*this);
@@ -430,13 +437,20 @@ struct PlaceHolder final : public Building {
   ~PlaceHolder() = default;
 };
 
+struct Context;
+
 struct TaskCenter final : public Building {
   BuildingInfo info_;
+  std::reference_wrapper<Context> ctx_;
 
-  explicit TaskCenter()
-      : info_(BuildingType::TaskCenter, {2, 2}, Direction::Up) {}
+  explicit TaskCenter(Context &ctx)
+      : info_(BuildingType::TaskCenter, {2, 2}, Direction::Up), ctx_(ctx) {}
 
   BuildingInfo info() const override { return this->info_; }
+
+  void input(MapAccessor &, Buffer &, Capability) override;
+
+  vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const override;
 
   unique_ptr<Building> clone() const override {
     return std::make_unique<TaskCenter>(*this);
