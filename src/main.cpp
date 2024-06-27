@@ -1,5 +1,6 @@
 #include "core/core.hpp"
 #include "core/machine.hpp"
+#include "core/ore.hpp"
 #include "ui/machine.hpp"
 #include "vec/vec.hpp"
 
@@ -10,9 +11,11 @@
 #include <gtkmm/button.h>
 #include <gtkmm/enums.h>
 #include <gtkmm/gridview.h>
+#include <gtkmm/image.h>
 #include <gtkmm/label.h>
 #include <gtkmm/listbox.h>
 #include <gtkmm/listboxrow.h>
+#include <gtkmm/scrolledwindow.h>
 #include <gtkmm/widget.h>
 #include <sigc++/connection.h>
 #include <sigc++/signal.h>
@@ -42,6 +45,19 @@ struct Connections {
 };
 
 class Chunk : public Gtk::Button {
+  static Gtk::Image load_icon(const shapezx::Item &item) {
+    if (item == shapezx::IRON_ORE) {
+      return Gtk::Image{"./assets/iron.png"};
+    }
+    if (item == shapezx::GOLD) {
+      return Gtk::Image{"./assets/gold.png"};
+    }
+    if (item == shapezx::STONE) {
+      return Gtk::Image{"./assets/stone.png"};
+    }
+    return {};
+  }
+
 public:
   using sig_machine_placed = sigc::signal<void(
       std::vector<shapezx::vec::Vec2<>>, shapezx::Building *)>;
@@ -50,13 +66,18 @@ public:
   std::reference_wrapper<UIState> ui_state;
   sig_machine_placed machine_placed;
 
+  Gtk::Image ore_icon;
+
   explicit Chunk(shapezx::MapAccessor current_chunk_, UIState &ui_state)
       : map_accessor(current_chunk_), ui_state(ui_state) {
     this->reset_label();
     this->set_expand(true);
     this->set_halign(Gtk::Align::FILL);
     this->set_valign(Gtk::Align::FILL);
-    // this->set();
+    if (auto ore = current_chunk_.current_chunk().ore; ore) {
+      this->ore_icon = load_icon(*ore);
+      this->set_child(this->ore_icon);
+    }
   }
 
   void on_clicked() override {
@@ -186,12 +207,13 @@ public:
   }
 };
 
-class MainGame : public Gtk::Window {
+class MainGame final : public Gtk::Window {
 protected:
   shapezx::State state;
   UIState ui_state;
   sigc::signal<void(shapezx::BuildingType)> on_placing_machine_begin;
   Map map;
+  Gtk::ScrolledWindow map_window;
   Connections conns;
   Gtk::Box box;
   shapezx::ui::MachineSelector machines;
@@ -219,14 +241,15 @@ public:
     }));
 
     this->set_title("shapezx");
-    this->set_default_size(1920 / 4, 1080 / 4);
+    this->set_default_size(1920, 1080);
 
     this->box.set_expand(false);
     // this->box.set_vexpand(true);
     this->box.set_valign(Gtk::Align::FILL);
     this->box.set_halign(Gtk::Align::FILL);
 
-    this->box.append(this->map);
+    this->map_window.set_child(this->map);
+    this->box.append(this->map_window);
     this->box.append(this->machines);
 
     this->set_expand(false);
