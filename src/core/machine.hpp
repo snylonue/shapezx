@@ -40,6 +40,7 @@ enum class BuildingType {
   Belt,
   Cutter,
   TrashCan,
+  TaskCenter,
   PlaceHolder,
 };
 
@@ -279,8 +280,8 @@ struct Building {
     return {};
   };
 
-  // INVARIANCE: chunks bewteen (0, 0) and relative_rect() either have placeholder or
-  // have no building
+  // INVARIANCE: chunks bewteen (0, 0) and relative_rect() either have
+  // placeholder or have no building
   virtual vec::Vec2<ssize_t> relative_rect() const {
     auto size = this->info().size;
     auto d = this->info().direction;
@@ -419,6 +420,19 @@ struct PlaceHolder final : public Building {
   ~PlaceHolder() = default;
 };
 
+struct TaskCenter final : public Building {
+  BuildingInfo info_;
+
+  explicit TaskCenter()
+      : info_(BuildingType::TaskCenter, {2, 2}, Direction::Up) {}
+
+  BuildingInfo info() const override { return this->info_; }
+
+  unique_ptr<Building> clone() const override {
+    return std::make_unique<TaskCenter>(*this);
+  }
+};
+
 } // namespace shapezx
 
 namespace std {
@@ -437,6 +451,8 @@ template <> struct std::formatter<shapezx::BuildingType> {
       return std::format_to(ctx.out(), "cutter");
     case shapezx::BuildingType::TrashCan:
       return std::format_to(ctx.out(), "trashcan");
+    case shapezx::BuildingType::TaskCenter:
+      return std::format_to(ctx.out(), "taskcenter");
     case shapezx::BuildingType::PlaceHolder:
       return std::format_to(ctx.out(), "placeholder");
     }
