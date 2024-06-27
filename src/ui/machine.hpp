@@ -110,7 +110,10 @@ public:
   }
 
   void on_clicked() override {
-    this->machine_removed.emit(this->id_);
+    if (this->ui_state_.get().machine_removing) {
+      this->machine_removed.emit(this->id_);
+      this->ui_state_.get().machine_removing = false;
+    }
   }
 
   sigc::signal<void(std::uint32_t)> signal_machine_removed() {
