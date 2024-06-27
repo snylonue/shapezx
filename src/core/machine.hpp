@@ -274,6 +274,20 @@ struct Building {
   }
 
   virtual BuildingInfo info() const = 0;
+
+  virtual pair<size_t, size_t> size() const {
+    auto info = this->info();
+    auto dir = info.direction;
+    auto size = info.size;
+
+    if (size.first == size.second || dir == Direction::Up ||
+        dir == Direction::Down) {
+      return size;
+    }
+
+    return {size.second, size.first};
+  }
+
   virtual unique_ptr<Building> clone() const = 0;
 
   virtual void input(MapAccessor &, Buffer &, Capability) {};

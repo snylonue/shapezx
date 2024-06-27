@@ -201,7 +201,7 @@ public:
               for (auto chk : v) {
                 this->remove(this->chunks[chk[0] * width + chk[1]]);
               }
-              auto [w, h] = ref->info().size;
+              auto [w, h] = ref->size();
               auto get = [](size_t i) {
                 return [=](const shapezx::vec::Vec2<> &v) { return v[i]; };
               };
