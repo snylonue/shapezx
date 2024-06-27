@@ -4,6 +4,7 @@
 #include "vec/vec.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
 #include <gtkmm/button.h>
@@ -22,12 +23,11 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
-struct UIState {
-  std::optional<shapezx::BuildingType> machine_selected = std::nullopt;
-};
+using shapezx::ui::UIState;
 
 struct Connections {
   std::vector<sigc::connection> conns;
@@ -47,10 +47,10 @@ public:
       std::vector<shapezx::vec::Vec2<>>, shapezx::Building *)>;
 
   shapezx::MapAccessor map_accessor;
-  std::reference_wrapper<const UIState> ui_state;
+  std::reference_wrapper<UIState> ui_state;
   sig_machine_placed machine_placed;
 
-  explicit Chunk(shapezx::MapAccessor current_chunk_, const UIState &ui_state)
+  explicit Chunk(shapezx::MapAccessor current_chunk_, UIState &ui_state)
       : map_accessor(current_chunk_), ui_state(ui_state) {
     this->reset_label();
     this->set_expand(true);
@@ -60,7 +60,7 @@ public:
   }
 
   void on_clicked() override {
-    if (auto placing = this->ui_state.get().machine_selected;
+    if (auto &placing = this->ui_state.get().machine_selected;
         placing && !this->map_accessor.current_chunk().building) {
       std::unique_ptr<shapezx::Building> machine;
       switch (*placing) {
@@ -87,6 +87,8 @@ public:
       auto ref = machine.get();
       auto modified = this->map_accessor.add_machine(std::move(machine));
       this->machine_placed.emit(modified, ref);
+
+      placing.reset();
     }
   }
 
@@ -110,13 +112,23 @@ public:
   }
 };
 
+struct IdGenerator {
+  std::uint32_t cur = 0;
+
+  std::uint32_t gen() {
+    this->cur += 1;
+    return this->cur;
+  }
+};
+
 class Map : public Gtk::Grid {
 public:
   std::vector<Chunk> chunks;
-  std::vector<shapezx::ui::Machine> machines;
+  std::unordered_map<std::uint32_t, shapezx::ui::Machine> machines;
   Connections conns;
+  IdGenerator id_;
 
-  explicit Map(const UIState &ui_state, shapezx::State &game_state) {
+  explicit Map(UIState &ui_state, shapezx::State &game_state) {
     this->set_expand(true);
     this->set_valign(Gtk::Align::FILL);
     this->set_halign(Gtk::Align::FILL);
@@ -130,7 +142,28 @@ public:
         conns.add(chunk.signal_machine_placed().connect(
             [&, width = game_state.map.width](
                 std::vector<shapezx::vec::Vec2<>> v, shapezx::Building *ref) {
-              auto &machine = this->machines.emplace_back(ref->info().type);
+              auto id = this->id_.gen();
+              auto it = this->machines
+                            .insert(std::make_pair(
+                                id, shapezx::ui::Machine{ref->info().type, v[0],
+                                                         id, ui_state}))
+                            .first;
+
+              auto &machine = it->second;
+
+              conns.add(machine.signal_machine_removed().connect(
+                  [&game_state, width, this](std::uint32_t id) {
+                    auto &m = this->machines.at(id);
+                    auto pos = m.pos_;
+                    auto acc = game_state.create_accessor_at(pos);
+                    this->remove(m);
+                    auto res = acc.remove_machine();
+
+                    for (auto chk : res) {
+                      this->attach(this->chunks[chk[0] * width + chk[1]],
+                                   chk[1], chk[0]);
+                    }
+                  }));
 
               for (auto chk : v) {
                 this->remove(this->chunks[chk[0] * width + chk[1]]);
@@ -179,6 +212,11 @@ public:
         [this](shapezx::BuildingType type) {
           this->ui_state.machine_selected = type;
         }));
+
+    this->conns.add(this->machines.signal_remove_selected().connect([this]() {
+      this->ui_state.machine_removing = true;
+      this->ui_state.machine_selected.reset();
+    }));
 
     this->set_title("shapezx");
     this->set_default_size(1920 / 4, 1080 / 4);

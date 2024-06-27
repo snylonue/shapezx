@@ -115,10 +115,9 @@ struct MapAccessor {
     auto rect = machine->relative_rect();
     vector<vec::Vec2<>> res{this->pos};
     if (!m[this->pos].building) {
-      for (auto [r, c] :
-           rect_iter(rect) | std::views::filter([](auto const v) {
-             return std::get<0>(v) || std::get<1>(v);
-           })) {
+      for (auto [r, c] : rect_iter(rect) | std::views::filter([](auto const v) {
+                           return std::get<0>(v) || std::get<1>(v);
+                         })) {
         auto [chk, acc] = this->get_chunk_and_accessor({r, c});
         res.push_back(acc.pos);
         if (chk.building) {
@@ -129,6 +128,19 @@ struct MapAccessor {
       }
 
       m[pos].building = std::make_optional(std::move(machine));
+    }
+
+    return res;
+  }
+
+  vector<vec::Vec2<>> remove_machine() {
+    auto &machine = this->current_chunk().building.value();
+    auto rect = machine->relative_rect();
+    vector<vec::Vec2<>> res; 
+    for (auto [r, c] : rect_iter(rect)) {
+      auto [chk, acc] = this->get_chunk_and_accessor({r, c});
+      res.push_back(acc.pos);
+      chk.building.reset();
     }
 
     return res;
