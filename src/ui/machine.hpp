@@ -1,6 +1,8 @@
 #include "../core/machine.hpp"
 
 #include <cstdint>
+#include <gdkmm/pixbuf.h>
+#include <glibmm/refptr.h>
 #include <glibmm/signalproxy.h>
 #include <gtkmm/box.h>
 #include <gtkmm/button.h>
@@ -81,18 +83,20 @@ public:
 };
 
 class Machine final : public Gtk::Button {
-  static Gtk::Image load_icon(BuildingType type) {
+  static Glib::RefPtr<Gdk::Pixbuf> load_icon(BuildingType type) {
     switch (type) {
     case BuildingType::Miner:
-      return Gtk::Image{"./assets/miner.png"};
+      return Gdk::Pixbuf::create_from_file("./assets/miner.png");
     case BuildingType::TrashCan:
-      return Gtk::Image{"./assets/trashcan.png"};
+      return Gdk::Pixbuf::create_from_file("./assets/trashcan.png");
     case BuildingType::Belt:
-      return Gtk::Image{"./assets/belt.png"};
+      return Gdk::Pixbuf::create_from_file("./assets/belt.png");
     case BuildingType::Cutter:
-      return Gtk::Image{"./assets/cutter_large.png"};
+      return Gdk::Pixbuf::create_from_file("./assets/cutter_large.png");
+    case BuildingType::TaskCenter:
+      return Gdk::Pixbuf::create_from_file("./assets/task_center.png");
     default:
-      return Gtk::Image{};
+      std::unreachable();
     }
   }
 
@@ -104,10 +108,25 @@ public:
   std::reference_wrapper<UIState> ui_state_;
   sigc::signal<void(std::uint32_t)> machine_removed;
 
-  explicit Machine(BuildingType type, vec::Vec2<> pos, std::uint32_t id,
-                   UIState &ui_state)
-      : type_(type), pos_(pos), id_(id), icon_(load_icon(type)),
-        ui_state_(ui_state) {
+  explicit Machine(BuildingType type, vec::Vec2<> pos, Direction d,
+                   std::uint32_t id, UIState &ui_state)
+      : type_(type), pos_(pos), id_(id), ui_state_(ui_state) {
+    auto pixbuf = load_icon(type);
+    switch (d) {
+    case Direction::Right:
+      this->icon_.set(pixbuf->rotate_simple(Gdk::Pixbuf::Rotation::CLOCKWISE));
+      break;
+    case Direction::Down:
+      this->icon_.set(pixbuf->rotate_simple(Gdk::Pixbuf::Rotation::UPSIDEDOWN));
+      break;
+    case Direction::Left:
+      this->icon_.set(
+          pixbuf->rotate_simple(Gdk::Pixbuf::Rotation::COUNTERCLOCKWISE));
+      break;
+    default:
+      this->icon_.set(pixbuf);
+      break;
+    }
     this->icon_.set_expand();
     this->set_child(this->icon_);
   }
