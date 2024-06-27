@@ -65,4 +65,11 @@ public:
     return this->sig_machine_selected;
   }
 };
+
+class Machine final : public Gtk::Button {
+public:
+  shapezx::BuildingType type_;
+
+  explicit Machine(shapezx::BuildingType type) : type_(type) {}
+};
 } // namespace shapezx::ui
