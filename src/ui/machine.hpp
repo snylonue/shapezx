@@ -67,9 +67,29 @@ public:
 };
 
 class Machine final : public Gtk::Button {
-public:
-  shapezx::BuildingType type_;
 
-  explicit Machine(shapezx::BuildingType type) : type_(type) {}
+  static Gtk::Image load_icon(BuildingType type) {
+    switch (type) {
+    case BuildingType::Miner:
+      return Gtk::Image{"./assets/miner.png"};
+    case BuildingType::TrashCan:
+      return Gtk::Image{"./assets/trashcan.png"};
+    case BuildingType::Belt:
+      return Gtk::Image{"./assets/belt.png"};
+    case BuildingType::Cutter:
+      return Gtk::Image{"./assets/cutter_large.png"};
+    default:
+      return Gtk::Image{};
+    }
+  }
+
+public:
+  BuildingType type_;
+  Gtk::Image icon_;
+
+  explicit Machine(BuildingType type) : type_(type), icon_(load_icon(type)) {
+    this->icon_.set_expand();
+    this->set_child(this->icon_);
+  }
 };
 } // namespace shapezx::ui

@@ -3,6 +3,7 @@
 #include "ui/machine.hpp"
 #include "vec/vec.hpp"
 
+#include <algorithm>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
 #include <gtkmm/button.h>
@@ -42,9 +43,12 @@ struct Connections {
 
 class Chunk : public Gtk::Button {
 public:
+  using sig_machine_placed = sigc::signal<void(
+      std::vector<shapezx::vec::Vec2<>>, shapezx::Building *)>;
+
   shapezx::MapAccessor map_accessor;
   std::reference_wrapper<const UIState> ui_state;
-  sigc::signal<void(std::vector<shapezx::vec::Vec2<>>)> machine_placed;
+  sig_machine_placed machine_placed;
 
   explicit Chunk(shapezx::MapAccessor current_chunk_, const UIState &ui_state)
       : map_accessor(current_chunk_), ui_state(ui_state) {
@@ -80,8 +84,9 @@ public:
         return;
       }
 
+      auto ref = machine.get();
       auto modified = this->map_accessor.add_machine(std::move(machine));
-      this->machine_placed.emit(modified);
+      this->machine_placed.emit(modified, ref);
     }
   }
 
@@ -100,8 +105,7 @@ public:
                         .value_or("")));
   }
 
-  sigc::signal<void(std::vector<shapezx::vec::Vec2<>>)>
-  signal_machine_placed() const {
+  sig_machine_placed signal_machine_placed() const {
     return this->machine_placed;
   }
 };
@@ -109,6 +113,7 @@ public:
 class Map : public Gtk::Grid {
 public:
   std::vector<Chunk> chunks;
+  std::vector<shapezx::ui::Machine> machines;
   Connections conns;
 
   explicit Map(const UIState &ui_state, shapezx::State &game_state) {
@@ -123,11 +128,24 @@ public:
         auto &chunk = this->chunks.emplace_back(
             game_state.create_accessor_at({r, c}), ui_state);
         conns.add(chunk.signal_machine_placed().connect(
-            [&, width =
-                    game_state.map.width](std::vector<shapezx::vec::Vec2<>> v) {
+            [&, width = game_state.map.width](
+                std::vector<shapezx::vec::Vec2<>> v, shapezx::Building *ref) {
+              auto &machine = this->machines.emplace_back(ref->info().type);
+
               for (auto chk : v) {
-                this->chunks[chk[0] * width + chk[1]].reset_label();
+                this->remove(this->chunks[chk[0] * width + chk[1]]);
               }
+              auto [w, h] = ref->info().size;
+              auto get = [](size_t i) {
+                return [=](const shapezx::vec::Vec2<> &v) { return v[i]; };
+              };
+
+              auto r =
+                  std::ranges::min(v | std::ranges::views::transform(get(0)));
+              auto c =
+                  std::ranges::min(v | std::ranges::views::transform(get(1)));
+
+              this->attach(machine, c, r, w, h);
             }));
         this->attach(chunk, c, r);
       }

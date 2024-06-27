@@ -295,6 +295,16 @@ struct Building {
   virtual ~Building() = default;
 };
 
+inline auto rect_iter(vec::Vec2<ssize_t> to) {
+  auto iota = [](ssize_t f, ssize_t t) {
+    ssize_t distence = (f < t) ? t - f : f - t;
+    ssize_t sign = (f <= t) ? 1 : -1;
+    return std::views::iota(0, distence) |
+           std::views::transform([=](ssize_t d) { return f + d * sign; });
+  };
+  return std::views::cartesian_product(iota(0, to[0]), iota(0, to[1]));
+}
+
 struct Miner final : public Building {
   BuildingInfo info_;
   Buffer ores;

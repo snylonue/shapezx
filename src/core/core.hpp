@@ -115,18 +115,10 @@ struct MapAccessor {
     auto rect = machine->relative_rect();
     vector<vec::Vec2<>> res{this->pos};
     if (!m[this->pos].building) {
-      auto iota_ = [](ssize_t f, ssize_t t) {
-        ssize_t distence = (f < t) ? t - f : f - t;
-        ssize_t sign = (f <= t) ? 1 : -1;
-        return std::views::iota(0, distence) |
-               std::views::transform([=](ssize_t d) { return f + d * sign; });
-      };
-
-      auto view =
-          std::views::cartesian_product(iota_(0, rect[0]), iota_(0, rect[1])) |
-          std::views::filter(
-              [](auto const v) { return std::get<0>(v) || std::get<1>(v); });
-      for (auto [r, c] : view) {
+      for (auto [r, c] :
+           rect_iter(rect) | std::views::filter([](auto const v) {
+             return std::get<0>(v) || std::get<1>(v);
+           })) {
         auto [chk, acc] = this->get_chunk_and_accessor({r, c});
         res.push_back(acc.pos);
         if (chk.building) {
