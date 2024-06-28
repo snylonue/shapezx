@@ -47,7 +47,7 @@ void Miner::update(MapAccessor m) {
   const auto &chk = m.current_chunk();
   if (chk.ore) {
     const auto &ore = chk.ore.value();
-    this->ores.increase(ore, m.ctx.get().efficiency_factor);
+    this->ores.increase(ore, m.ctx.get().eff.miner);
   }
 
   if (!this->ores.empty()) {
@@ -62,7 +62,7 @@ vector<vec::Vec2<size_t>> Belt::input_positons(MapAccessor &m) const {
 }
 
 void Belt::input(MapAccessor &m, Buffer &buf, Capability cap) {
-  cap = cap.merge(this->transport_capability(m.ctx.get().efficiency_factor));
+  cap = cap.merge(this->transport_capability(m.ctx.get().eff.belt));
 
   consume(buf, this->buffer, cap);
 }
@@ -75,7 +75,7 @@ void Belt::update(MapAccessor m) {
     if (this->progress == 100) {
       this->progress = 0;
       auto capability =
-          this->transport_capability(m.ctx.get().efficiency_factor);
+          this->transport_capability(m.ctx.get().eff.belt);
       output_to(m, to_vec2(this->info_.direction), this->buffer, capability);
     }
   }

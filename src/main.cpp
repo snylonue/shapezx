@@ -229,19 +229,19 @@ public:
 
     auto &miner = this->options.emplace_back("Upgrade miner");
     connect(miner, [this]() {
-      this->game_state_.get().efficiency_factor += 1;
+      this->game_state_.get().eff.miner += 1;
       this->destroy();
     });
 
     auto &belt = this->options.emplace_back("Upgrade belt");
     connect(belt, [this]() {
-      this->game_state_.get().efficiency_factor += 1;
+      this->game_state_.get().eff.belt += 1;
       this->destroy();
     });
 
     auto &cutter = this->options.emplace_back("Upgrade cutter");
     connect(cutter, [this]() {
-      this->game_state_.get().efficiency_factor += 1;
+      this->game_state_.get().eff.cutter += 1;
       this->destroy();
     });
 

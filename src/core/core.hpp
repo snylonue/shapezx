@@ -43,6 +43,12 @@ struct Chunk {
   void update(MapAccessor);
 };
 
+struct Efficiency {
+  std::int32_t miner = 1;
+  std::int32_t belt = 1;
+  std::int32_t cutter = 1;
+};
+
 struct State;
 
 struct Map {
@@ -152,7 +158,7 @@ struct MapAccessor {
 
 struct State {
   Map map;
-  std::int32_t efficiency_factor = 1;
+  Efficiency eff;
   Buffer store;
   vector<Task> tasks;
 
