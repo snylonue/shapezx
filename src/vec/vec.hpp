@@ -1,12 +1,17 @@
 #ifndef SHAPEZX_VEC_VEC_HPP
 #define SHAPEZX_VEC_VEC_HPP
 
+#include <nlohmann/json.hpp>
+
 #include <array>
 #include <concepts>
 #include <cstddef>
 #include <format>
+#include <nlohmann/json_fwd.hpp>
 
 namespace shapezx::vec {
+
+using nlohmann::json;
 
 // clang-format off
 template <typename T, typename U = T>
@@ -70,6 +75,17 @@ template <Arithmetic T = std::size_t> struct Vec2 {
 
   bool operator==(const Vec2 &rhs) const { return this->data == rhs.data; }
 };
+
+template<Arithmetic T>
+void to_json(json &j, const Vec2<T> &v) {
+  j = json::array(v.data);
+}
+
+template<Arithmetic T>
+void from_json(const json &j, Vec2<T> &v) {
+  j.get_to(v.data);
+}
+
 } // namespace shapezx::vec
 
 namespace std {

@@ -43,6 +43,10 @@ void consume(Buffer &from, Buffer &to, Capability cap) {
 
 void Building::update(MapAccessor) {}
 
+void to_json(json &j, const Building &p) { p.to_json(j); }
+
+void from_json(const json &j, Building &p) { p.from_json(j); }
+
 void Miner::update(MapAccessor m) {
   const auto &chk = m.current_chunk();
   if (chk.ore) {
@@ -74,8 +78,7 @@ void Belt::update(MapAccessor m) {
     this->progress += 10;
     if (this->progress == 100) {
       this->progress = 0;
-      auto capability =
-          this->transport_capability(m.ctx.get().eff.belt);
+      auto capability = this->transport_capability(m.ctx.get().eff.belt);
       output_to(m, to_vec2(this->info_.direction), this->buffer, capability);
     }
   }
@@ -122,24 +125,32 @@ void TrashCan::input(MapAccessor &, Buffer &buf, Capability cap) {
   consume(buf, tmp, cap);
 }
 
+Building *PlaceHolder::base(MapAccessor &m) {
+  return m.map.get()[this->pos_].building->get();
+}
+
+const Building *PlaceHolder::base(MapAccessor &m) const {
+  return m.map.get()[this->pos_].building->get();
+}
+
 void PlaceHolder::input(MapAccessor &m, Buffer &buf, Capability cap) {
   auto acc = m.relocate(this->pos_);
-  return this->base_->input(acc, buf, cap);
+  return this->base(m)->input(acc, buf, cap);
 }
 
 vector<vec::Vec2<size_t>> PlaceHolder::input_positons(MapAccessor &m) const {
   auto acc = m.relocate(this->pos_);
-  return this->base_->input_positons(acc);
+  return this->base(m)->input_positons(acc);
 }
 
 void TaskCenter::input(MapAccessor &, Buffer &buf, Capability cap) {
-  for (auto &[item, val] : buf.items) {
-    auto accepts = cap.num_accepts(item).value_or(val);
+  consume(buf, this->buffer, cap);
+}
 
-    if (accepts) {
-      val -= accepts;
-      this->ctx_.get().take_item(item, accepts);
-    }
+void TaskCenter::update(MapAccessor m) {
+  for (auto &[item, num] : this->buffer.items) {
+    m.ctx.get().take_item(item, num);
+    num = 0;
   }
 }
 

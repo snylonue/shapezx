@@ -11,6 +11,7 @@
 #include <format>
 #include <iterator>
 #include <memory>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
@@ -44,12 +45,28 @@ enum class BuildingType {
   PlaceHolder,
 };
 
+NLOHMANN_JSON_SERIALIZE_ENUM(BuildingType,
+                             {
+                                 {BuildingType::Miner, "miner"},
+                                 {BuildingType::Belt, "belt"},
+                                 {BuildingType::TrashCan, "trashcan"},
+                                 {BuildingType::TaskCenter, "taskcenter"},
+                                 {BuildingType::PlaceHolder, "placeholder"},
+                             })
+
 enum class Direction {
   Up,
   Down,
   Left,
   Right,
 };
+
+NLOHMANN_JSON_SERIALIZE_ENUM(Direction, {
+                                            {Direction::Up, "up"},
+                                            {Direction::Down, "down"},
+                                            {Direction::Left, "left"},
+                                            {Direction::Right, "right"},
+                                        })
 
 constexpr Direction left_of(Direction d) {
   switch (d) {
@@ -136,6 +153,8 @@ struct Buffer {
                this->items, [](const auto &pair) { return pair.second == 0; });
   }
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Buffer, items)
 
 struct Capability {
   struct None {
@@ -265,6 +284,8 @@ struct BuildingInfo {
   Direction direction;
 };
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BuildingInfo, type, size, direction)
+
 struct MapAccessor;
 
 struct Building {
@@ -307,8 +328,15 @@ struct Building {
   // update internal state by 1 tick
   virtual void update(MapAccessor);
 
+  virtual void to_json(json &j) const = 0;
+  virtual void from_json(const json &j) = 0;
+
   virtual ~Building() = default;
 };
+
+void to_json(json &j, const Building &p);
+
+void from_json(const json &j, Building &p);
 
 inline auto rect_iter(vec::Vec2<ssize_t> to) {
   auto iota = [](ssize_t f, ssize_t t) {
@@ -324,6 +352,7 @@ struct Miner final : public Building {
   BuildingInfo info_;
   Buffer ores;
 
+  Miner() = default;
   explicit Miner(Direction direction_)
       : info_(BuildingType::Miner, {1, 1}, direction_) {}
 
@@ -337,6 +366,15 @@ struct Miner final : public Building {
 
   void update(MapAccessor m) override;
 
+  void to_json(json &j) const override {
+    j = {{"info", this->info_}, {"ores", this->ores}};
+  }
+
+  void from_json(const json &j) override {
+    j.at("info").get_to(this->info_);
+    j.at("ores").get_to(this->ores);
+  }
+
   ~Miner() override = default;
 };
 
@@ -345,6 +383,7 @@ struct Belt final : public Building {
   std::uint32_t progress = 0;
   Buffer buffer;
 
+  Belt() = default;
   explicit Belt(Direction direction_)
       : info_(BuildingType::Belt, {1, 1}, direction_) {}
 
@@ -360,6 +399,20 @@ struct Belt final : public Building {
 
   unique_ptr<Building> clone() const override {
     return std::make_unique<Belt>(*this);
+  }
+
+  void to_json(json &j) const override {
+    j = {
+        {"info", this->info_},
+        {"progress", this->progress},
+        {"buffer", this->buffer},
+    };
+  }
+
+  void from_json(const json &j) override {
+    j.at("info").get_to(this->info_);
+    j.at("progress").get_to(this->progress);
+    j.at("ores").get_to(this->buffer);
   }
 
   ~Belt() override = default;
@@ -384,6 +437,7 @@ struct Cutter final : public Building {
   Buffer in;
   Buffer out;
 
+  Cutter() = default;
   explicit Cutter(Direction direction_)
       : info_(BuildingType::Cutter, {2, 1}, direction_) {}
 
@@ -405,12 +459,27 @@ struct Cutter final : public Building {
     return std::make_unique<Cutter>(*this);
   }
 
+  void to_json(json &j) const override {
+    j = {
+        {"info", this->info_},
+        {"in", this->in},
+        {"out", this->out},
+    };
+  }
+
+  void from_json(const json &j) override {
+    j.at("info").get_to(this->info_);
+    j.at("in").get_to(this->in);
+    j.at("out").get_to(this->out);
+  }
+
   ~Cutter() override = default;
 };
 
 struct TrashCan final : public Building {
   BuildingInfo info_;
 
+  TrashCan() = default;
   explicit TrashCan(Direction direction_)
       : info_(BuildingType::TrashCan, {1, 1}, direction_) {}
 
@@ -426,17 +495,24 @@ struct TrashCan final : public Building {
     return std::make_unique<TrashCan>(*this);
   }
 
+  void to_json(json &j) const override {
+    j = {
+        {"info", this->info_},
+    };
+  }
+
+  void from_json(const json &j) override { j.at("info").get_to(this->info_); }
+
   ~TrashCan() override = default;
 };
 
 struct PlaceHolder final : public Building {
   BuildingInfo info_;
-  Building *base_; // main document lifetime requirement
   vec::Vec2<> pos_;
 
-  explicit PlaceHolder(Direction direction_, Building *base, vec::Vec2<> pos)
-      : info_(BuildingType::PlaceHolder, {1, 1}, direction_), base_(base),
-        pos_(pos) {}
+  PlaceHolder() : pos_(0, 0) {}
+  explicit PlaceHolder(Direction direction_, vec::Vec2<> pos)
+      : info_(BuildingType::PlaceHolder, {1, 1}, direction_), pos_(pos) {}
 
   BuildingInfo info() const override { return this->info_; }
 
@@ -448,6 +524,21 @@ struct PlaceHolder final : public Building {
     return std::make_unique<PlaceHolder>(*this);
   }
 
+  Building *base(MapAccessor &m);
+  const Building *base(MapAccessor &m) const;
+
+  void to_json(json &j) const override {
+    j = {
+        {"info", this->info_},
+        {"pos", this->pos_},
+    };
+  }
+
+  void from_json(const json &j) override {
+    j.at("info").get_to(this->info_);
+    j.at("pos").get_to(this->pos_);
+  }
+
   ~PlaceHolder() = default;
 };
 
@@ -455,10 +546,10 @@ struct State;
 
 struct TaskCenter final : public Building {
   BuildingInfo info_;
-  std::reference_wrapper<State> ctx_;
+  Buffer buffer;
 
-  explicit TaskCenter(State &ctx)
-      : info_(BuildingType::TaskCenter, {2, 2}, Direction::Up), ctx_(ctx) {}
+  explicit TaskCenter()
+      : info_(BuildingType::TaskCenter, {2, 2}, Direction::Up) {}
 
   BuildingInfo info() const override { return this->info_; }
 
@@ -466,8 +557,22 @@ struct TaskCenter final : public Building {
 
   vector<vec::Vec2<size_t>> input_positons(MapAccessor &) const override;
 
+  void update(MapAccessor) override;
+
   unique_ptr<Building> clone() const override {
     return std::make_unique<TaskCenter>(*this);
+  }
+
+  void to_json(json &j) const override {
+    j = {
+        {"info", this->info_},
+        {"buffer", this->buffer},
+    };
+  }
+
+  void from_json(const json &j) override {
+    j.at("info").get_to(this->info_);
+    j.at("buffer").get_to(this->buffer);
   }
 };
 

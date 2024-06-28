@@ -6,6 +6,9 @@
 #include "ore.hpp"
 #include "task.hpp"
 
+#include <nlohmann/detail/exceptions.hpp>
+#include <nlohmann/json.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -13,6 +16,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <random>
 #include <ranges>
@@ -22,6 +26,8 @@
 #include <vector>
 
 namespace shapezx {
+
+using nlohmann::json;
 
 using std::nullopt;
 using std::size_t;
@@ -42,6 +48,10 @@ struct Chunk {
 
   void update(MapAccessor);
 };
+
+void to_json(json &j, const Chunk &p);
+
+void from_json(const json &j, Chunk &p);
 
 struct Efficiency {
   std::int32_t miner = 1;
@@ -132,8 +142,8 @@ struct MapAccessor {
         if (chk.building) {
           throw std::exception();
         }
-        chk.building = std::make_unique<PlaceHolder>(machine->info().direction,
-                                                     machine.get(), this->pos);
+        chk.building =
+            std::make_unique<PlaceHolder>(machine->info().direction, this->pos);
       }
 
       m[pos].building = std::make_optional(std::move(machine));
@@ -156,10 +166,15 @@ struct MapAccessor {
   }
 };
 
+struct Global {
+  std::uint32_t value = 0;
+};
+
 struct State {
   Map map;
   Efficiency eff;
   Buffer store;
+  std::uint32_t value = 0;
   vector<Task> tasks;
 
   State(size_t height, size_t width, size_t seed) : map(height, width, seed) {}
@@ -173,9 +188,11 @@ struct State {
     return {pos, this->map, *this};
   }
 
-  void update(std::function<void()> on_task_complete) {
+  void update(std::function<void()> on_task_complete, Global &global_state) {
     // std::cout << "updating\n";
     this->map.update(*this);
+    global_state.value += this->value;
+    this->value = 0;
 
     for (auto &task : this->tasks) {
       if (task.update(*this)) {
@@ -187,12 +204,13 @@ struct State {
   void take_item(const Item &item, size_t num) {
     std::cout << std::format("take {} {}\n", num, item.name);
     this->store.increase(item, num);
+    this->value += item.value * num;
   }
 
   void add_task(Task &&task) { this->tasks.push_back(std::move(task)); }
-};
 
-struct Global {};
+  void serialize() const {}
+};
 
 } // namespace shapezx
 

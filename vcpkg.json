@@ -1,5 +1,6 @@
 {
   "dependencies": [
-    "gtkmm"
+    "gtkmm",
+    "nlohmann-json"
   ]
 }

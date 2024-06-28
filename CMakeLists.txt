@@ -11,9 +11,10 @@ set(
 
 find_package(PkgConfig)
 pkg_check_modules(GTKMM_VARS REQUIRED IMPORTED_TARGET gtkmm-4.0)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 add_executable(${PROJECT_NAME} src/main.cpp src/core/core.cpp src/core/machine.cpp src/core/task.cpp src/ui/machine.cpp)
-target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::GTKMM_VARS -fsanitize=undefined -fsanitize=address -shared-libasan)
+target_link_libraries(${PROJECT_NAME} PRIVATE PkgConfig::GTKMM_VARS PRIVATE nlohmann_json::nlohmann_json -fsanitize=undefined -fsanitize=address -shared-libasan)
 
 add_custom_target(copy_assets
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets

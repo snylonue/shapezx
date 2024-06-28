@@ -256,6 +256,7 @@ public:
 class MainGame final : public Gtk::Window {
 protected:
   shapezx::State state;
+  shapezx::Global global_state;
   UIState ui_state;
   sigc::signal<void(shapezx::BuildingType)> on_placing_machine_begin;
   Glib::RefPtr<Gtk::EventControllerKey> ev_key;
@@ -274,7 +275,8 @@ public:
 
     this->conns.add(Glib::signal_timeout().connect(
         [this]() {
-          this->state.update([this]() { this->upgrade_machine.show(); });
+          this->state.update([this]() { this->upgrade_machine.show(); },
+                             this->global_state);
           return true;
         },
         50));

@@ -22,4 +22,51 @@ void Map::update(State &ctx) {
     }
   }
 }
+
+void to_json(json &j, const Chunk &p) {
+  if (p.ore) {
+    j["ore"] = *p.ore;
+  }
+}
+
+void from_json(const json &j, Chunk &p) {
+  try {
+    Item it;
+    j.at("ore").get_to(it);
+    p.ore = it;
+  } catch (const nlohmann::detail::out_of_range &) {
+    p.ore = nullopt;
+  }
+  try {
+    BuildingInfo info;
+    j.at("info").get_to(info);
+    auto serialize_building = [&](std::unique_ptr<Building> &&b) {
+      b->from_json(j);
+      p.building = std::move(b);
+    };
+    switch (info.type) {
+    case BuildingType::Miner:
+      serialize_building(std::make_unique<Miner>());
+      break;
+    case BuildingType::Belt:
+      serialize_building(std::make_unique<Belt>());
+      break;
+    case BuildingType::Cutter:
+      serialize_building(std::make_unique<Cutter>());
+      break;
+    case BuildingType::TrashCan:
+      serialize_building(std::make_unique<TrashCan>());
+      break;
+    case BuildingType::TaskCenter:
+      serialize_building(std::make_unique<TaskCenter>());
+      break;
+    case BuildingType::PlaceHolder:
+      serialize_building(std::make_unique<PlaceHolder>());
+      break;
+      break;
+    }
+  } catch (const nlohmann::detail::out_of_range &) {
+    p.building = nullopt;
+  }
+}
 } // namespace shapezx
