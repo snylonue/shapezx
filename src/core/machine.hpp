@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <iostream>
 #include <iterator>
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
@@ -49,6 +50,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(BuildingType,
                              {
                                  {BuildingType::Miner, "miner"},
                                  {BuildingType::Belt, "belt"},
+                                 {BuildingType::Cutter, "cutter"},
                                  {BuildingType::TrashCan, "trashcan"},
                                  {BuildingType::TaskCenter, "taskcenter"},
                                  {BuildingType::PlaceHolder, "placeholder"},
@@ -289,11 +291,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BuildingInfo, type, size, direction)
 struct MapAccessor;
 
 struct Building {
-  template <typename T, typename... Args>
-  static unique_ptr<Building> create(Args &&...args) {
-    return std::make_unique<T>(std::forward<Args>(args)...);
-  }
-
   virtual BuildingInfo info() const = 0;
 
   virtual pair<size_t, size_t> size() const {
@@ -410,9 +407,10 @@ struct Belt final : public Building {
   }
 
   void from_json(const json &j) override {
+    std::cout << j << '\n';
     j.at("info").get_to(this->info_);
     j.at("progress").get_to(this->progress);
-    j.at("ores").get_to(this->buffer);
+    j.at("buffer").get_to(this->buffer);
   }
 
   ~Belt() override = default;
@@ -468,6 +466,7 @@ struct Cutter final : public Building {
   }
 
   void from_json(const json &j) override {
+    std::cout << j << '\n';
     j.at("info").get_to(this->info_);
     j.at("in").get_to(this->in);
     j.at("out").get_to(this->out);

@@ -12,7 +12,7 @@ std::unique_ptr<Machine> Machine::create(BuildingType type, vec::Vec2<> pos,
         ui_state);
   case BuildingType::TrashCan:
     return std::make_unique<Machine>(
-        type, Gdk::Pixbuf::create_from_file("./assets/trashcan.png"), pos, d,
+        type, Gdk::Pixbuf::create_from_file("./assets/trash.png"), pos, d,
         id, ui_state);
   case BuildingType::Belt:
     return std::make_unique<Machine>(

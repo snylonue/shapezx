@@ -1,6 +1,7 @@
 #ifndef SHAPEZX_CORE_ORE
 #define SHAPEZX_CORE_ORE
 
+#include <nlohmann/detail/macro_scope.hpp>
 #include <nlohmann/json.hpp>
 
 #include <array>
@@ -27,9 +28,7 @@ struct Item {
   };
 };
 
-void to_json(json &j, const Item &item);
-void from_json(const json &j, Item &item);
-
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Item, name, value);
 
 static const Item IRON_ORE{"iron ore", 30};
 static const Item GOLD{"gold", 60};

@@ -6,7 +6,9 @@
 #include "ore.hpp"
 #include "task.hpp"
 
+#include <filesystem>
 #include <nlohmann/detail/exceptions.hpp>
+#include <nlohmann/detail/macro_scope.hpp>
 #include <nlohmann/json.hpp>
 
 #include <cstddef>
@@ -46,6 +48,8 @@ struct Chunk {
       : ore(chunk.ore), building(chunk.building.transform(
                             [](const auto &b) { return b->clone(); })) {}
 
+  Chunk& operator=(Chunk&& other) = default;
+
   void update(MapAccessor);
 };
 
@@ -59,6 +63,8 @@ struct Efficiency {
   std::int32_t cutter = 1;
 };
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Efficiency, miner, belt, cutter);
+
 struct State;
 
 struct Map {
@@ -69,6 +75,7 @@ struct Map {
   size_t height;
   size_t width;
 
+  Map() = default;
   Map(size_t h, size_t w, size_t seed) : chunks(h * w), height(h), width(w) {
     std::mt19937_64 gen{seed};
     std::bernoulli_distribution has_ore(HAS_ORE_PROBALITY);
@@ -98,6 +105,8 @@ struct Map {
   void update(State &ctx);
 };
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Map, chunks, height, width);
+
 struct MapAccessor {
   vec::Vec2<size_t> pos;
   std::reference_wrapper<Map> map;
@@ -125,7 +134,7 @@ struct MapAccessor {
   }
 
   // Returns r + current position .
-  vec::Vec2<size_t> relative_pos_by(vec::Vec2<ssize_t> r) {
+  vec::Vec2<size_t> relative_pos_by(vec::Vec2<ssize_t> r) const {
     return this->pos + r;
   }
 
@@ -170,6 +179,8 @@ struct Global {
   std::uint32_t value = 0;
 };
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Global, value);
+
 struct State {
   Map map;
   Efficiency eff;
@@ -177,6 +188,7 @@ struct State {
   std::uint32_t value = 0;
   vector<Task> tasks;
 
+  State() = default;
   State(size_t height, size_t width, size_t seed) : map(height, width, seed) {}
 
   State(size_t height, size_t width)
@@ -209,8 +221,10 @@ struct State {
 
   void add_task(Task &&task) { this->tasks.push_back(std::move(task)); }
 
-  void serialize() const {}
+  void save_to(std::filesystem::path) const;
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(State, map, eff, store, value, tasks);
 
 } // namespace shapezx
 

@@ -1,6 +1,7 @@
 #ifndef SHAPEZX_VEC_VEC_HPP
 #define SHAPEZX_VEC_VEC_HPP
 
+#include <nlohmann/detail/macro_scope.hpp>
 #include <nlohmann/json.hpp>
 
 #include <array>
@@ -8,6 +9,7 @@
 #include <cstddef>
 #include <format>
 #include <nlohmann/json_fwd.hpp>
+#include <type_traits>
 
 namespace shapezx::vec {
 
@@ -29,9 +31,9 @@ concept Scalar = Arithmetic<K> && requires(K c, T x) {
 // clang-format on
 
 template <Arithmetic T = std::size_t> struct Vec2 {
-  std::array<T, 2> data;
+  std::array<T, 2> data {0, 0};
 
-  Vec2() = delete;
+  Vec2() = default;
   Vec2(const T a1, const T a2) : data({a1, a2}) {}
 
   auto &&operator[](this auto &&self, std::integral auto i) {
@@ -76,15 +78,8 @@ template <Arithmetic T = std::size_t> struct Vec2 {
   bool operator==(const Vec2 &rhs) const { return this->data == rhs.data; }
 };
 
-template<Arithmetic T>
-void to_json(json &j, const Vec2<T> &v) {
-  j = json::array(v.data);
-}
-
-template<Arithmetic T>
-void from_json(const json &j, Vec2<T> &v) {
-  j.get_to(v.data);
-}
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Vec2<size_t>, data);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Vec2<std::make_signed_t<size_t>>, data);
 
 } // namespace shapezx::vec
 

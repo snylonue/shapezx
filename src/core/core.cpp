@@ -1,6 +1,10 @@
 #include "core.hpp"
 #include "machine.hpp"
 
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <nlohmann/json.hpp>
 #include <ranges>
 
 namespace shapezx {
@@ -26,23 +30,42 @@ void Map::update(State &ctx) {
 void to_json(json &j, const Chunk &p) {
   if (p.ore) {
     j["ore"] = *p.ore;
+  } else {
+    j["ore"] = nullptr;
   }
+  if (p.building) {
+    json b;
+    auto &building = *p.building;
+    building->to_json(b);
+    std::cout << b << '\n';
+    j["building"] = b;
+  } else {
+    j["building"] = nullptr;
+  }
+
+  std::cout << j << '\n';
 }
 
 void from_json(const json &j, Chunk &p) {
+  std::cout << "t1\n";
   try {
     Item it;
     j.at("ore").get_to(it);
     p.ore = it;
-  } catch (const nlohmann::detail::out_of_range &) {
+  } catch (const json::exception &) {
     p.ore = nullopt;
   }
+  std::cout << "t2\n";
   try {
+    std::cout << j << '\n';
     BuildingInfo info;
-    j.at("info").get_to(info);
+    j.at("/building/info"_json_pointer).get_to(info);
+    std::cout << "info\n";
     auto serialize_building = [&](std::unique_ptr<Building> &&b) {
-      b->from_json(j);
+      b->from_json(j["building"]);
+      std::cout << "building set\n";
       p.building = std::move(b);
+      std::cout << "building set\n";
     };
     switch (info.type) {
     case BuildingType::Miner:
@@ -63,10 +86,16 @@ void from_json(const json &j, Chunk &p) {
     case BuildingType::PlaceHolder:
       serialize_building(std::make_unique<PlaceHolder>());
       break;
-      break;
     }
-  } catch (const nlohmann::detail::out_of_range &) {
+  } catch (const json::exception &e) {
+    // std::cout << e.what() << '\n';
     p.building = nullopt;
   }
+  std::cout << "t3\n";
+}
+
+void State::save_to(std::filesystem::path p) const {
+  std::ofstream f(p);
+  f << json(*this);
 }
 } // namespace shapezx

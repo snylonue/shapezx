@@ -77,7 +77,8 @@ protected:
   Gtk::Button remove;
   Gtk::Image remove_icon;
   sigc::signal<void(BuildingType)> sig_machine_selected;
-  sigc::signal<void()> sig_remove_selected;
+  
+  Gtk::Button save;
 
 public:
   explicit MachineSelector() : remove_icon(Gtk::Image{"./assets/remove.png"}) {
@@ -98,6 +99,7 @@ public:
     }
 
     this->append(this->remove);
+    this->append(this->save);
 
     this->set_hexpand();
     this->set_halign(Gtk::Align::CENTER);
@@ -109,6 +111,10 @@ public:
 
   Glib::SignalProxy<void()> signal_remove_selected() {
     return this->remove.signal_clicked();
+  }
+
+  Glib::SignalProxy<void()> signal_save() {
+    return this->save.signal_clicked();
   }
 };
 

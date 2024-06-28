@@ -1,12 +1,12 @@
 #include "core/core.hpp"
 #include "core/machine.hpp"
 #include "core/ore.hpp"
-#include "core/task.hpp"
 #include "ui/machine.hpp"
 #include "vec/vec.hpp"
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <gdk/gdkkeysyms.h>
 #include <gdkmm/enums.h>
 #include <glib.h>
@@ -26,13 +26,15 @@
 #include <gtkmm/scrolledwindow.h>
 #include <gtkmm/widget.h>
 #include <gtkmm/window.h>
-#include <iostream>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <sigc++/connection.h>
 #include <sigc++/signal.h>
 
 #include <cstddef>
 #include <format>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -40,6 +42,7 @@
 #include <utility>
 #include <vector>
 
+using nlohmann::json;
 using shapezx::ui::Connections;
 using shapezx::ui::UIState;
 
@@ -88,20 +91,19 @@ public:
       std::unique_ptr<shapezx::Building> machine;
       switch (*placing) {
       case shapezx::BuildingType::Miner:
-        machine = shapezx::Building::create<shapezx::Miner>(dir.value());
+        machine = std::make_unique<shapezx::Miner>(dir.value());
         break;
       case shapezx::BuildingType::Belt:
-        machine = shapezx::Building::create<shapezx::Belt>(dir.value());
+        machine = std::make_unique<shapezx::Belt>(dir.value());
         break;
       case shapezx::BuildingType::Cutter:
-        machine = shapezx::Building::create<shapezx::Cutter>(dir.value());
+        machine = std::make_unique<shapezx::Cutter>(dir.value());
         break;
       case shapezx::BuildingType::TrashCan:
-        machine = shapezx::Building::create<shapezx::TrashCan>(dir.value());
+        machine = std::make_unique<shapezx::TrashCan>(dir.value());
         break;
       case shapezx::BuildingType::TaskCenter:
-        machine = shapezx::Building::create<shapezx::TaskCenter>(
-            this->map_accessor.ctx.get());
+        machine = std::make_unique<shapezx::TaskCenter>();
         break;
       default:
         return;
@@ -158,55 +160,76 @@ public:
     this->set_valign(Gtk::Align::FILL);
     this->set_halign(Gtk::Align::FILL);
 
+    auto place_machine = [&, width = game_state.map.width](
+                             std::vector<shapezx::vec::Vec2<>> v,
+                             shapezx::Building *ref) {
+      auto id = this->id_.gen();
+      auto it = this->machines
+                    .insert(std::make_pair(
+                        id, shapezx::ui::Machine::create(ref->info().type, v[0],
+                                                         ref->info().direction,
+                                                         id, ui_state)))
+                    .first;
+
+      auto &machine = it->second;
+
+      conns.add(machine->signal_machine_removed().connect(
+          [&game_state, width = game_state.map.width, this](std::uint32_t id) {
+            auto &m = this->machines.at(id);
+            auto pos = m->pos_;
+            auto acc = game_state.create_accessor_at(pos);
+            this->remove(*m);
+            auto res = acc.remove_machine();
+
+            for (auto chk : res) {
+              this->attach(this->chunks[chk[0] * width + chk[1]], chk[1],
+                           chk[0]);
+            }
+          }));
+
+      for (auto chk : v) {
+        this->remove(this->chunks[chk[0] * width + chk[1]]);
+      }
+      auto [w, h] = ref->size();
+      auto get = [](size_t i) {
+        return [=](const shapezx::vec::Vec2<> &v) { return v[i]; };
+      };
+
+      auto r = std::ranges::min(v | std::ranges::views::transform(get(0)));
+      auto c = std::ranges::min(v | std::ranges::views::transform(get(1)));
+
+      this->attach(*machine, c, r, w, h);
+    };
+
     for (auto const r :
          std::views::iota(std::size_t(0), game_state.map.height)) {
       for (auto const c :
            std::views::iota(std::size_t(0), game_state.map.width)) {
         auto &chunk = this->chunks.emplace_back(
             game_state.create_accessor_at({r, c}), ui_state);
-        conns.add(chunk.signal_machine_placed().connect(
-            [&, width = game_state.map.width](
-                std::vector<shapezx::vec::Vec2<>> v, shapezx::Building *ref) {
-              auto id = this->id_.gen();
-              auto it = this->machines
-                            .insert(std::make_pair(
-                                id, shapezx::ui::Machine::create(
-                                        ref->info().type, v[0],
-                                        ref->info().direction, id, ui_state)))
-                            .first;
-
-              auto &machine = it->second;
-
-              conns.add(machine->signal_machine_removed().connect(
-                  [&game_state, width, this](std::uint32_t id) {
-                    auto &m = this->machines.at(id);
-                    auto pos = m->pos_;
-                    auto acc = game_state.create_accessor_at(pos);
-                    this->remove(*m);
-                    auto res = acc.remove_machine();
-
-                    for (auto chk : res) {
-                      this->attach(this->chunks[chk[0] * width + chk[1]],
-                                   chk[1], chk[0]);
-                    }
-                  }));
-
-              for (auto chk : v) {
-                this->remove(this->chunks[chk[0] * width + chk[1]]);
-              }
-              auto [w, h] = ref->size();
-              auto get = [](size_t i) {
-                return [=](const shapezx::vec::Vec2<> &v) { return v[i]; };
-              };
-
-              auto r =
-                  std::ranges::min(v | std::ranges::views::transform(get(0)));
-              auto c =
-                  std::ranges::min(v | std::ranges::views::transform(get(1)));
-
-              this->attach(*machine, c, r, w, h);
-            }));
+        conns.add(chunk.signal_machine_placed().connect(place_machine));
         this->attach(chunk, c, r);
+      }
+    }
+
+    for (auto const r :
+         std::views::iota(std::size_t(0), game_state.map.height)) {
+      for (auto const c :
+           std::views::iota(std::size_t(0), game_state.map.width)) {
+        auto acc = game_state.create_accessor_at({r, c});
+        if (auto &building = acc.current_chunk().building;
+            building && building.value()->info().type !=
+                            shapezx::BuildingType::PlaceHolder) {
+          auto ref = building->get();
+          auto v =
+              shapezx::rect_iter(ref->relative_rect()) |
+              std::ranges::views::transform(
+                  [acc](std::pair<shapezx::ssize_t, shapezx::ssize_t> pair) {
+                    return acc.relative_pos_by({pair.first, pair.second});
+                  }) |
+              std::ranges::to<std::vector<shapezx::vec::Vec2<>>>();
+          place_machine(v, ref);
+        }
       }
     }
   }
@@ -295,6 +318,9 @@ public:
       }
     }));
 
+    this->conns.add(this->machines.signal_save().connect(
+        [this]() { this->state.save_to("D:/dump.json"); }));
+
     this->ev_key->set_propagation_phase(Gtk::PropagationPhase::CAPTURE);
     this->conns.add(this->ev_key->signal_key_pressed().connect(
         [this](guint keyval, guint, Gdk::ModifierType) {
@@ -340,8 +366,15 @@ public:
 };
 
 int main(int argc, char **argv) {
-  auto state = shapezx::State(20, 30);
-  state.add_task(shapezx::Task{.target_ = {{{shapezx::IRON_ORE, 10}}}});
+  // auto state = shapezx::State(20, 30);
+  // state.add_task(shapezx::Task{.target_ = {{{shapezx::IRON_ORE, 10}}}});
+
+  std::ifstream f("D:/dump.json");
+  auto j = json::parse(f);
+  std::cout << 'y';
+  auto state = j.template get<shapezx::State>();
+
+  std::cout << 'x';
 
   auto app = Gtk::Application::create();
 
