@@ -4,6 +4,7 @@
 #include "../vec/vec.hpp"
 #include "machine.hpp"
 #include "ore.hpp"
+#include "task.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -30,14 +31,6 @@ using std::vector;
 
 using ssize_t = std::make_signed_t<size_t>;
 
-struct Context {
-  std::int32_t efficiency_factor = 1;
-
-  void take_item(const Item &item, size_t num) {
-    std::cout << std::format("take {} {}\n", num, item.name);
-  }
-};
-
 struct Chunk {
   optional<Item> ore;
   optional<unique_ptr<Building>> building;
@@ -49,6 +42,8 @@ struct Chunk {
 
   void update(MapAccessor);
 };
+
+struct State;
 
 struct Map {
   static constexpr double HAS_ORE_PROBALITY = 0.3;
@@ -84,15 +79,15 @@ struct Map {
     return self[pos[0], pos[1]];
   }
 
-  void update(Context &ctx);
+  void update(State &ctx);
 };
 
 struct MapAccessor {
   vec::Vec2<size_t> pos;
   std::reference_wrapper<Map> map;
-  std::reference_wrapper<Context> ctx;
+  std::reference_wrapper<State> ctx;
 
-  MapAccessor(vec::Vec2<size_t> p, Map &m, Context &ctx_)
+  MapAccessor(vec::Vec2<size_t> p, Map &m, State &ctx_)
       : pos(p), map(m), ctx(ctx_) {}
 
   auto &current_chunk(this auto &&self) {
@@ -157,25 +152,42 @@ struct MapAccessor {
 
 struct State {
   Map map;
-  Context ctx;
+  std::int32_t efficiency_factor = 1;
+  Buffer store;
+  vector<Task> tasks;
 
   State(size_t height, size_t width, size_t seed) : map(height, width, seed) {}
 
   State(size_t height, size_t width)
       : State(height, width, std::random_device()()) {}
 
-  State(const Map &&map_, const Context &&ctx_)
-      : map(std::move(map_)), ctx(std::move(ctx_)) {}
+  State(Map &&map_) : map(std::move(map_)) {}
 
   MapAccessor create_accessor_at(shapezx::vec::Vec2<std::size_t> pos) {
-    return {pos, this->map, this->ctx};
+    return {pos, this->map, *this};
   }
 
-  void update() {
+  void update(std::function<void()> on_task_complete) {
     // std::cout << "updating\n";
-    this->map.update(this->ctx);
+    this->map.update(*this);
+
+    for (auto &task : this->tasks) {
+      if (task.update(*this)) {
+        on_task_complete();
+      }
+    }
   }
+
+  void take_item(const Item &item, size_t num) {
+    std::cout << std::format("take {} {}\n", num, item.name);
+    this->store.increase(item, num);
+  }
+
+  void add_task(Task &&task) { this->tasks.push_back(std::move(task)); }
 };
+
+struct Global {};
+
 } // namespace shapezx
 
 #endif

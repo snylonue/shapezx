@@ -12,7 +12,7 @@ void Chunk::update(MapAccessor m) {
   }
 }
 
-void Map::update(Context &ctx) {
+void Map::update(State &ctx) {
   for (auto const [r, row] : this->chunks |
                                  std::ranges::views::chunk(this->width) |
                                  std::ranges::views::enumerate) {

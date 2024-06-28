@@ -451,13 +451,13 @@ struct PlaceHolder final : public Building {
   ~PlaceHolder() = default;
 };
 
-struct Context;
+struct State;
 
 struct TaskCenter final : public Building {
   BuildingInfo info_;
-  std::reference_wrapper<Context> ctx_;
+  std::reference_wrapper<State> ctx_;
 
-  explicit TaskCenter(Context &ctx)
+  explicit TaskCenter(State &ctx)
       : info_(BuildingType::TaskCenter, {2, 2}, Direction::Up), ctx_(ctx) {}
 
   BuildingInfo info() const override { return this->info_; }

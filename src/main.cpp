@@ -1,6 +1,7 @@
 #include "core/core.hpp"
 #include "core/machine.hpp"
 #include "core/ore.hpp"
+#include "core/task.hpp"
 #include "ui/machine.hpp"
 #include "vec/vec.hpp"
 
@@ -12,6 +13,7 @@
 #include <glibmm/refptr.h>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
+#include <gtkmm/box.h>
 #include <gtkmm/button.h>
 #include <gtkmm/enums.h>
 #include <gtkmm/eventcontroller.h>
@@ -23,6 +25,7 @@
 #include <gtkmm/listboxrow.h>
 #include <gtkmm/scrolledwindow.h>
 #include <gtkmm/widget.h>
+#include <gtkmm/window.h>
 #include <iostream>
 #include <sigc++/connection.h>
 #include <sigc++/signal.h>
@@ -37,19 +40,8 @@
 #include <utility>
 #include <vector>
 
+using shapezx::ui::Connections;
 using shapezx::ui::UIState;
-
-struct Connections {
-  std::vector<sigc::connection> conns;
-
-  void add(sigc::connection &&conn) { conns.push_back(std::move(conn)); }
-
-  ~Connections() {
-    for (auto &conn : this->conns) {
-      conn.disconnect();
-    }
-  }
-};
 
 class Chunk : public Gtk::Button {
   static Gtk::Image load_icon(const shapezx::Item &item) {
@@ -156,7 +148,8 @@ struct IdGenerator {
 class Map : public Gtk::Grid {
 public:
   std::vector<Chunk> chunks;
-  std::unordered_map<std::uint32_t, shapezx::ui::Machine> machines;
+  std::unordered_map<std::uint32_t, std::unique_ptr<shapezx::ui::Machine>>
+      machines;
   Connections conns;
   IdGenerator id_;
 
@@ -177,19 +170,19 @@ public:
               auto id = this->id_.gen();
               auto it = this->machines
                             .insert(std::make_pair(
-                                id, shapezx::ui::Machine{ref->info().type, v[0],
-                                                         ref->info().direction,
-                                                         id, ui_state}))
+                                id, shapezx::ui::Machine::create(
+                                        ref->info().type, v[0],
+                                        ref->info().direction, id, ui_state)))
                             .first;
 
               auto &machine = it->second;
 
-              conns.add(machine.signal_machine_removed().connect(
+              conns.add(machine->signal_machine_removed().connect(
                   [&game_state, width, this](std::uint32_t id) {
                     auto &m = this->machines.at(id);
-                    auto pos = m.pos_;
+                    auto pos = m->pos_;
                     auto acc = game_state.create_accessor_at(pos);
-                    this->remove(m);
+                    this->remove(*m);
                     auto res = acc.remove_machine();
 
                     for (auto chk : res) {
@@ -211,11 +204,52 @@ public:
               auto c =
                   std::ranges::min(v | std::ranges::views::transform(get(1)));
 
-              this->attach(machine, c, r, w, h);
+              this->attach(*machine, c, r, w, h);
             }));
         this->attach(chunk, c, r);
       }
     }
+  }
+};
+
+class UpgradeMachine final : public Gtk::Window {
+public:
+  std::reference_wrapper<shapezx::State> game_state_;
+
+  Gtk::Box selector;
+  std::vector<Gtk::Button> options;
+
+  Connections conns;
+
+  UpgradeMachine(shapezx::State &game_state)
+      : game_state_(game_state), selector(Gtk::Orientation::VERTICAL) {
+    auto connect = [this](auto &but, auto sig) {
+      this->conns.add(but.signal_clicked().connect(sig));
+    };
+
+    auto &miner = this->options.emplace_back("Upgrade miner");
+    connect(miner, [this]() {
+      this->game_state_.get().efficiency_factor += 1;
+      this->destroy();
+    });
+
+    auto &belt = this->options.emplace_back("Upgrade belt");
+    connect(belt, [this]() {
+      this->game_state_.get().efficiency_factor += 1;
+      this->destroy();
+    });
+
+    auto &cutter = this->options.emplace_back("Upgrade cutter");
+    connect(cutter, [this]() {
+      this->game_state_.get().efficiency_factor += 1;
+      this->destroy();
+    });
+
+    for (auto &but : this->options) {
+      this->selector.append(but);
+    }
+
+    this->set_child(this->selector);
   }
 };
 
@@ -230,15 +264,17 @@ protected:
   Connections conns;
   Gtk::Box box;
   shapezx::ui::MachineSelector machines;
+  UpgradeMachine upgrade_machine;
 
 public:
   explicit MainGame(shapezx::State &&state)
       : state(std::move(state)), ev_key(Gtk::EventControllerKey::create()),
-        map(this->ui_state, this->state), box(Gtk::Orientation::VERTICAL) {
+        map(this->ui_state, this->state), box(Gtk::Orientation::VERTICAL),
+        upgrade_machine(this->state) {
 
     this->conns.add(Glib::signal_timeout().connect(
         [this]() {
-          this->state.update();
+          this->state.update([this]() { this->upgrade_machine.show(); });
           return true;
         },
         50));
@@ -250,9 +286,11 @@ public:
         }));
 
     this->conns.add(this->machines.signal_remove_selected().connect([this]() {
-      this->ui_state.machine_removing = true;
-      this->ui_state.machine_selected.reset();
-      this->ui_state.direction.reset();
+      if (!this->ui_state.map_locked) {
+        this->ui_state.machine_removing = true;
+        this->ui_state.machine_selected.reset();
+        this->ui_state.direction.reset();
+      }
     }));
 
     this->ev_key->set_propagation_phase(Gtk::PropagationPhase::CAPTURE);
@@ -301,6 +339,7 @@ public:
 
 int main(int argc, char **argv) {
   auto state = shapezx::State(20, 30);
+  state.add_task(shapezx::Task{.target_ = {{{shapezx::IRON_ORE, 10}}}});
 
   auto app = Gtk::Application::create();
 
