@@ -6,7 +6,6 @@
 #include "ore.hpp"
 #include "task.hpp"
 
-#include <filesystem>
 #include <nlohmann/detail/exceptions.hpp>
 #include <nlohmann/detail/macro_scope.hpp>
 #include <nlohmann/json.hpp>
@@ -23,6 +22,7 @@
 #include <random>
 #include <ranges>
 #include <span>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -151,8 +151,8 @@ struct MapAccessor {
         if (chk.building) {
           throw std::exception();
         }
-        chk.building =
-            std::make_unique<PlaceHolder>(machine->info().id, machine->info().direction, this->pos);
+        chk.building = std::make_unique<PlaceHolder>(
+            machine->info().id, machine->info().direction, this->pos);
       }
 
       m[pos].building = std::make_optional(std::move(machine));
@@ -176,20 +176,51 @@ struct MapAccessor {
 };
 
 struct Global {
+  static Global load(const std::string &p) noexcept;
+
   std::uint32_t value = 0;
+
+  optional<size_t> last_played;
 
   size_t max_height = 20;
   size_t max_width = 30;
 
-  std::vector<std::filesystem::path> saves;
+  std::vector<std::string> saves;
 
-  std::filesystem::path &create_save() {
+  std::string &create_save() {
     auto n = this->saves.size();
     return saves.emplace_back(std::format("./saves/{}.json", n));
   }
+
+  void save_to(const std::string &p) const;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Global, value);
+inline void to_json(nlohmann::json &nlohmann_json_j,
+                    const Global &nlohmann_json_t) {
+  nlohmann_json_j["value"] = nlohmann_json_t.value;
+  if (nlohmann_json_t.last_played) {
+    nlohmann_json_j["last_played"] = *nlohmann_json_t.last_played;
+  } else {
+    nlohmann_json_j["last_played"] = nullptr;
+  }
+  nlohmann_json_j["max_height"] = nlohmann_json_t.max_height;
+  nlohmann_json_j["max_width"] = nlohmann_json_t.max_width;
+  nlohmann_json_j["saves"] = nlohmann_json_t.saves;
+}
+inline void from_json(const nlohmann ::json &nlohmann_json_j,
+                      Global &nlohmann_json_t) {
+  nlohmann_json_j.at("value").get_to(nlohmann_json_t.value);
+  try {
+    size_t last;
+    nlohmann_json_j.at("last_played").get_to(last);
+    nlohmann_json_t.last_played = last;
+  } catch (...) {
+    nlohmann_json_t.last_played = nullopt;
+  }
+  nlohmann_json_j.at("max_height").get_to(nlohmann_json_t.max_height);
+  nlohmann_json_j.at("max_width").get_to(nlohmann_json_t.max_width);
+  nlohmann_json_j.at("saves").get_to(nlohmann_json_t.saves);
+};
 
 struct State {
   Map map;
@@ -231,7 +262,7 @@ struct State {
 
   void add_task(Task &&task) { this->tasks.push_back(std::move(task)); }
 
-  void save_to(const std::filesystem::path &) const;
+  void save_to(const std::string &) const;
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(State, map, eff, store, value, tasks);

@@ -94,9 +94,31 @@ void from_json(const json &j, Chunk &p) {
   std::cout << "t3\n";
 }
 
-void State::save_to(const std::filesystem::path &p) const {
-  std::ofstream f(p);
-  f << json(*this);
+Global Global::load(const std::string &p) noexcept try {
+  if (!std::filesystem::exists(p)) {
+    return {};
+  }
+  std::ifstream f(p);
+  auto j = json::parse(f);
   f.close();
+  return j.get<Global>();
+} catch (...) {
+  return {};
+}
+
+template <typename T>
+void save_json(const T &obj, const std::string &p) {
+  std::ofstream f(p);
+  auto j = json(obj);
+  f << j;
+  f.close();
+}
+
+void Global::save_to(const std::string &p) const {
+  save_json(*this, p);
+}
+
+void State::save_to(const std::string &p) const {
+  save_json(*this, p);
 }
 } // namespace shapezx

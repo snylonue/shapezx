@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <filesystem>
 #include <fstream>
 #include <gdk/gdkkeysyms.h>
 #include <gdkmm/enums.h>
@@ -28,6 +27,7 @@
 #include <gtkmm/scrolledwindow.h>
 #include <gtkmm/widget.h>
 #include <gtkmm/window.h>
+#include <nlohmann/detail/exceptions.hpp>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <sigc++/connection.h>
@@ -40,6 +40,7 @@
 #include <memory>
 #include <optional>
 #include <ranges>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -294,11 +295,11 @@ protected:
   Gtk::Box box;
   shapezx::ui::MachineSelector machines;
   UpgradeMachine upgrade_machine;
-  std::filesystem::path save_path;
+  std::string save_path;
 
 public:
   explicit MainGame(shapezx::State &&state, shapezx::Global &global_state,
-                    const std::filesystem::path &path)
+                    const std::string &path)
       : state(std::move(state)), global_state_(global_state),
         ev_key(Gtk::EventControllerKey::create()),
         map(this->ui_state, this->state), box(Gtk::Orientation::VERTICAL),
@@ -385,15 +386,28 @@ public:
   Gtk::Button open_store_;
   Gtk::Button exit_;
 
-  explicit StartScreen()
+  std::reference_wrapper<shapezx::Global> global_state_;
+
+  explicit StartScreen(shapezx::Global &global_state)
       : Gtk::Box(Gtk::Orientation::VERTICAL), continue_game_("Continue"),
-        new_game_("New Game"), open_store_("Open Store"), exit_("Exit") {
-    this->continue_game_.set_sensitive(false);
+        new_game_("New Game"), open_store_("Open Store"), exit_("Exit"),
+        global_state_(global_state) {
+
+    this->update();
 
     this->append(this->continue_game_);
     this->append(this->new_game_);
     this->append(this->open_store_);
     this->append(this->exit_);
+  }
+
+  void update() {
+    this->continue_game_.set_sensitive(
+        this->global_state_.get().last_played.has_value());
+  }
+
+  Glib::SignalProxy<void()> signal_continue_game() {
+    return this->continue_game_.signal_clicked();
   }
 
   Glib::SignalProxy<void()> signal_new_game() {
@@ -428,21 +442,17 @@ public:
 
 class App final : public Gtk::Window {
 public:
+  shapezx::Global global_state;
+
   StartScreen start_screen_;
   Store store_;
   std::optional<MainGame> main_game_;
   Connections conns;
 
-  shapezx::Global global_state;
-
-  explicit App() {
-    this->conns.add(this->start_screen_.signal_new_game().connect([this]() {
-      auto const &p = this->global_state.create_save();
-      // auto state = shapezx::State(this->global_state.max_height,
-      // this->global_state.max_width);
-      std::fstream f(p);
-      auto j = json::parse(f);
-      auto state = j.get<shapezx::State>();
+  explicit App()
+      : global_state(shapezx::Global::load("./global_state.json")),
+        start_screen_(this->global_state) {
+    auto begin_game = [this](shapezx::State &&state, const std::string &p) {
       auto &g =
           this->main_game_.emplace(std::move(state), this->global_state, p);
       this->conns.add(g.signal_destroy().connect([this]() {
@@ -452,6 +462,26 @@ public:
 
       g.present();
       this->start_screen_.set_visible(false);
+    };
+
+    this->conns.add(this->start_screen_.signal_continue_game().connect(
+        [this, begin_game]() {
+          auto last = this->global_state.last_played.value();
+          auto const &p = this->global_state.saves[last];
+          std::ifstream f(p);
+          auto j = json::parse(f);
+          auto state = j.get<shapezx::State>();
+
+          begin_game(std::move(state), p);
+        }));
+
+    this->conns.add(this->start_screen_.signal_new_game().connect([this, begin_game]() {
+      auto const &p = this->global_state.create_save();
+      this->global_state.last_played = this->global_state.saves.size() - 1;
+      auto state = shapezx::State(this->global_state.max_height,
+                                  this->global_state.max_width);
+
+      begin_game(std::move(state), p);
     }));
 
     this->conns.add(this->start_screen_.signal_open_store().connect(
@@ -459,6 +489,11 @@ public:
 
     this->conns.add(this->start_screen_.signal_exit().connect(
         [this]() { this->destroy(); }));
+
+    this->conns.add(this->signal_destroy().connect([this]() {
+      std::cout << "1\n";
+      this->global_state.save_to("./global_state.json");
+    }));
 
     this->set_child(this->start_screen_);
   }
