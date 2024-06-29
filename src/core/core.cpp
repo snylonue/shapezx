@@ -97,5 +97,6 @@ void from_json(const json &j, Chunk &p) {
 void State::save_to(const std::filesystem::path &p) const {
   std::ofstream f(p);
   f << json(*this);
+  f.close();
 }
 } // namespace shapezx
