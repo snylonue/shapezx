@@ -407,25 +407,21 @@ public:
 
   shapezx::Global global_state;
 
-  explicit App(Glib::RefPtr<Gtk::Application> app) {
-    this->conns.add(
-        this->start_screen_.signal_new_game().connect([this, app]() {
-          auto const &p = this->global_state.create_save();
-          auto state = shapezx::State(this->global_state.max_height,
-                                      this->global_state.max_width);
-          auto &g =
-              this->main_game_.emplace(std::move(state), this->global_state, p);
-          this->conns.add(g.signal_destroy().connect([this, app]() {
-            this->start_screen_.set_visible();
-            this->main_game_.reset();
-            app->release();
-          }));
-          app->add_window(g);
+  explicit App() {
+    this->conns.add(this->start_screen_.signal_new_game().connect([this]() {
+      auto const &p = this->global_state.create_save();
+      auto state = shapezx::State(this->global_state.max_height,
+                                  this->global_state.max_width);
+      auto &g =
+          this->main_game_.emplace(std::move(state), this->global_state, p);
+      this->conns.add(g.signal_destroy().connect([this]() {
+        this->start_screen_.set_visible();
+        this->main_game_.reset();
+      }));
 
-          g.present();
-          app->hold();
-          this->start_screen_.set_visible(false);
-        }));
+      g.present();
+      this->start_screen_.set_visible(false);
+    }));
 
     this->conns.add(this->start_screen_.signal_exit().connect(
         [this]() { this->destroy(); }));
@@ -437,5 +433,5 @@ public:
 int main(int argc, char **argv) {
   auto app = Gtk::Application::create();
 
-  return app->make_window_and_run<App>(argc, argv, app);
+  return app->make_window_and_run<App>(argc, argv);
 }
