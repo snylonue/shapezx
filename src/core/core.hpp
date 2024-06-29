@@ -152,7 +152,7 @@ struct MapAccessor {
           throw std::exception();
         }
         chk.building =
-            std::make_unique<PlaceHolder>(machine->info().direction, this->pos);
+            std::make_unique<PlaceHolder>(machine->info().id, machine->info().direction, this->pos);
       }
 
       m[pos].building = std::make_optional(std::move(machine));

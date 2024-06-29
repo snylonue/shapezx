@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <gdk/gdkkeysyms.h>
 #include <gdkmm/enums.h>
 #include <glib.h>
@@ -47,6 +48,15 @@ using nlohmann::json;
 using shapezx::ui::Connections;
 using shapezx::ui::UIState;
 
+struct IdGenerator {
+  std::uint32_t cur = 0;
+
+  std::uint32_t gen() {
+    this->cur += 1;
+    return this->cur;
+  }
+};
+
 class Chunk : public Gtk::Button {
   static Gtk::Image load_icon(const shapezx::Item &item) {
     if (item == shapezx::IRON_ORE) {
@@ -67,12 +77,14 @@ public:
 
   shapezx::MapAccessor map_accessor;
   std::reference_wrapper<UIState> ui_state;
+  std::reference_wrapper<IdGenerator> id_;
   sig_machine_placed machine_placed;
 
   Gtk::Image ore_icon;
 
-  explicit Chunk(shapezx::MapAccessor current_chunk_, UIState &ui_state)
-      : map_accessor(current_chunk_), ui_state(ui_state) {
+  explicit Chunk(shapezx::MapAccessor current_chunk_, UIState &ui_state,
+                 IdGenerator &id)
+      : map_accessor(current_chunk_), ui_state(ui_state), id_(id) {
     this->reset_label();
     this->set_expand(true);
     this->set_halign(Gtk::Align::FILL);
@@ -89,22 +101,23 @@ public:
         !this->map_accessor.current_chunk().building) {
       auto &placing = state.machine_selected;
       auto &dir = state.direction;
+      auto id = this->id_.get().gen();
       std::unique_ptr<shapezx::Building> machine;
       switch (*placing) {
       case shapezx::BuildingType::Miner:
-        machine = std::make_unique<shapezx::Miner>(dir.value());
+        machine = std::make_unique<shapezx::Miner>(id, dir.value());
         break;
       case shapezx::BuildingType::Belt:
-        machine = std::make_unique<shapezx::Belt>(dir.value());
+        machine = std::make_unique<shapezx::Belt>(id, dir.value());
         break;
       case shapezx::BuildingType::Cutter:
-        machine = std::make_unique<shapezx::Cutter>(dir.value());
+        machine = std::make_unique<shapezx::Cutter>(id, dir.value());
         break;
       case shapezx::BuildingType::TrashCan:
-        machine = std::make_unique<shapezx::TrashCan>(dir.value());
+        machine = std::make_unique<shapezx::TrashCan>(id, dir.value());
         break;
       case shapezx::BuildingType::TaskCenter:
-        machine = std::make_unique<shapezx::TaskCenter>();
+        machine = std::make_unique<shapezx::TaskCenter>(id);
         break;
       default:
         return;
@@ -139,15 +152,6 @@ public:
   }
 };
 
-struct IdGenerator {
-  std::uint32_t cur = 0;
-
-  std::uint32_t gen() {
-    this->cur += 1;
-    return this->cur;
-  }
-};
-
 class Map : public Gtk::Grid {
 public:
   std::vector<Chunk> chunks;
@@ -164,7 +168,7 @@ public:
     auto place_machine = [&, width = game_state.map.width](
                              std::vector<shapezx::vec::Vec2<>> v,
                              shapezx::Building *ref) {
-      auto id = this->id_.gen();
+      auto id = ref->info().id;
       auto it = this->machines
                     .insert(std::make_pair(
                         id, shapezx::ui::Machine::create(ref->info().type, v[0],
@@ -207,7 +211,7 @@ public:
       for (auto const c :
            std::views::iota(std::size_t(0), game_state.map.width)) {
         auto &chunk = this->chunks.emplace_back(
-            game_state.create_accessor_at({r, c}), ui_state);
+            game_state.create_accessor_at({r, c}), ui_state, this->id_);
         conns.add(chunk.signal_machine_placed().connect(place_machine));
         this->attach(chunk, c, r);
       }
@@ -378,15 +382,17 @@ class StartScreen final : public Gtk::Box {
 public:
   Gtk::Button continue_game_;
   Gtk::Button new_game_;
+  Gtk::Button open_store_;
   Gtk::Button exit_;
 
   explicit StartScreen()
       : Gtk::Box(Gtk::Orientation::VERTICAL), continue_game_("Continue"),
-        new_game_("New Game"), exit_("Exit") {
+        new_game_("New Game"), open_store_("Open Store"), exit_("Exit") {
     this->continue_game_.set_sensitive(false);
 
     this->append(this->continue_game_);
     this->append(this->new_game_);
+    this->append(this->open_store_);
     this->append(this->exit_);
   }
 
@@ -394,14 +400,36 @@ public:
     return this->new_game_.signal_clicked();
   }
 
+  Glib::SignalProxy<void()> signal_open_store() {
+    return this->open_store_.signal_clicked();
+  }
+
   Glib::SignalProxy<void()> signal_exit() {
     return this->exit_.signal_clicked();
+  }
+};
+
+class Store final : public Gtk::Window {
+public:
+  Gtk::Box box_;
+  Gtk::Button center_;
+  Gtk::Button map_;
+  Gtk::Button value_;
+
+  Store()
+      : box_(Gtk::Orientation::VERTICAL), center_("Enlarge Task Center"),
+        map_("Increase Map size"), value_("Increase value of ores") {
+    this->box_.append(this->center_);
+    this->box_.append(this->map_);
+    this->box_.append(this->value_);
+    this->set_child(this->box_);
   }
 };
 
 class App final : public Gtk::Window {
 public:
   StartScreen start_screen_;
+  Store store_;
   std::optional<MainGame> main_game_;
   Connections conns;
 
@@ -410,8 +438,11 @@ public:
   explicit App() {
     this->conns.add(this->start_screen_.signal_new_game().connect([this]() {
       auto const &p = this->global_state.create_save();
-      auto state = shapezx::State(this->global_state.max_height,
-                                  this->global_state.max_width);
+      // auto state = shapezx::State(this->global_state.max_height,
+      // this->global_state.max_width);
+      std::fstream f(p);
+      auto j = json::parse(f);
+      auto state = j.get<shapezx::State>();
       auto &g =
           this->main_game_.emplace(std::move(state), this->global_state, p);
       this->conns.add(g.signal_destroy().connect([this]() {
@@ -422,6 +453,9 @@ public:
       g.present();
       this->start_screen_.set_visible(false);
     }));
+
+    this->conns.add(this->start_screen_.signal_open_store().connect(
+        [this]() { this->store_.set_visible(); }));
 
     this->conns.add(this->start_screen_.signal_exit().connect(
         [this]() { this->destroy(); }));

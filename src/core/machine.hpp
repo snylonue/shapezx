@@ -281,12 +281,13 @@ struct Capability {
 };
 
 struct BuildingInfo {
+  uint32_t id;
   BuildingType type;
   pair<size_t, size_t> size;
   Direction direction;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BuildingInfo, type, size, direction)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(BuildingInfo, id, type, size, direction)
 
 struct MapAccessor;
 
@@ -350,8 +351,8 @@ struct Miner final : public Building {
   Buffer ores;
 
   Miner() = default;
-  explicit Miner(Direction direction_)
-      : info_(BuildingType::Miner, {1, 1}, direction_) {}
+  explicit Miner(uint32_t id, Direction direction_)
+      : info_(id, BuildingType::Miner, {1, 1}, direction_) {}
 
   Miner(const Miner &) = default;
 
@@ -381,8 +382,8 @@ struct Belt final : public Building {
   Buffer buffer;
 
   Belt() = default;
-  explicit Belt(Direction direction_)
-      : info_(BuildingType::Belt, {1, 1}, direction_) {}
+  explicit Belt(uint32_t id, Direction direction_)
+      : info_(id, BuildingType::Belt, {1, 1}, direction_) {}
 
   Belt(const Belt &) = default;
 
@@ -436,8 +437,8 @@ struct Cutter final : public Building {
   Buffer out;
 
   Cutter() = default;
-  explicit Cutter(Direction direction_)
-      : info_(BuildingType::Cutter, {2, 1}, direction_) {}
+  explicit Cutter(uint32_t id, Direction direction_)
+      : info_(id, BuildingType::Cutter, {2, 1}, direction_) {}
 
   Cutter(const Cutter &) = default;
 
@@ -479,8 +480,8 @@ struct TrashCan final : public Building {
   BuildingInfo info_;
 
   TrashCan() = default;
-  explicit TrashCan(Direction direction_)
-      : info_(BuildingType::TrashCan, {1, 1}, direction_) {}
+  explicit TrashCan(uint32_t id, Direction direction_)
+      : info_(id, BuildingType::TrashCan, {1, 1}, direction_) {}
 
   TrashCan(const TrashCan &) = default;
 
@@ -510,8 +511,8 @@ struct PlaceHolder final : public Building {
   vec::Vec2<> pos_;
 
   PlaceHolder() : pos_(0, 0) {}
-  explicit PlaceHolder(Direction direction_, vec::Vec2<> pos)
-      : info_(BuildingType::PlaceHolder, {1, 1}, direction_), pos_(pos) {}
+  explicit PlaceHolder(uint32_t id, Direction direction_, vec::Vec2<> pos)
+      : info_(id, BuildingType::PlaceHolder, {1, 1}, direction_), pos_(pos) {}
 
   BuildingInfo info() const override { return this->info_; }
 
@@ -547,8 +548,9 @@ struct TaskCenter final : public Building {
   BuildingInfo info_;
   Buffer buffer;
 
-  explicit TaskCenter()
-      : info_(BuildingType::TaskCenter, {2, 2}, Direction::Up) {}
+  TaskCenter() = default;
+  explicit TaskCenter(uint32_t id)
+      : info_(id, BuildingType::TaskCenter, {2, 2}, Direction::Up) {}
 
   BuildingInfo info() const override { return this->info_; }
 
