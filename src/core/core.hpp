@@ -222,12 +222,24 @@ inline void from_json(const nlohmann ::json &nlohmann_json_j,
   nlohmann_json_j.at("saves").get_to(nlohmann_json_t.saves);
 };
 
+struct IdGenerator {
+  std::uint32_t cur = 0;
+
+  std::uint32_t gen() {
+    this->cur += 1;
+    return this->cur;
+  }
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IdGenerator, cur);
+
 struct State {
   Map map;
   Efficiency eff;
   Buffer store;
   std::uint32_t value = 0;
   vector<Task> tasks;
+  IdGenerator id_;
 
   State() = default;
   State(size_t height, size_t width, size_t seed) : map(height, width, seed) {}
@@ -265,7 +277,7 @@ struct State {
   void save_to(const std::string &) const;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(State, map, eff, store, value, tasks);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(State, map, eff, store, value, tasks, id_);
 
 } // namespace shapezx
 

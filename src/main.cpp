@@ -46,17 +46,9 @@
 #include <vector>
 
 using nlohmann::json;
+using shapezx::IdGenerator;
 using shapezx::ui::Connections;
 using shapezx::ui::UIState;
-
-struct IdGenerator {
-  std::uint32_t cur = 0;
-
-  std::uint32_t gen() {
-    this->cur += 1;
-    return this->cur;
-  }
-};
 
 class Chunk : public Gtk::Button {
   static Gtk::Image load_icon(const shapezx::Item &item) {
@@ -171,10 +163,11 @@ public:
   std::unordered_map<std::uint32_t, std::unique_ptr<shapezx::ui::Machine>>
       machines;
   sigc::signal<void(std::uint32_t)> machine_removed_;
+  std::reference_wrapper<IdGenerator> id_;
   Connections conns;
-  IdGenerator id_;
 
-  explicit Map(UIState &ui_state, shapezx::State &game_state) {
+  explicit Map(UIState &ui_state, shapezx::State &game_state)
+      : id_(game_state.id_) {
     this->set_expand(true);
     this->set_valign(Gtk::Align::FILL);
     this->set_halign(Gtk::Align::FILL);
@@ -471,6 +464,7 @@ public:
       this->conns.add(g.signal_destroy().connect([this]() {
         this->start_screen_.set_visible();
         this->main_game_.reset();
+        this->start_screen_.update();
       }));
 
       g.present();
