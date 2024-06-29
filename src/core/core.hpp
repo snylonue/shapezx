@@ -48,7 +48,7 @@ struct Chunk {
       : ore(chunk.ore), building(chunk.building.transform(
                             [](const auto &b) { return b->clone(); })) {}
 
-  Chunk& operator=(Chunk&& other) = default;
+  Chunk &operator=(Chunk &&other) = default;
 
   void update(MapAccessor);
 };
@@ -177,6 +177,16 @@ struct MapAccessor {
 
 struct Global {
   std::uint32_t value = 0;
+
+  size_t max_height = 20;
+  size_t max_width = 30;
+
+  std::vector<std::filesystem::path> saves;
+
+  std::filesystem::path &create_save() {
+    auto n = this->saves.size();
+    return saves.emplace_back(std::format("./saves/{}.json", n));
+  }
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Global, value);
@@ -221,7 +231,7 @@ struct State {
 
   void add_task(Task &&task) { this->tasks.push_back(std::move(task)); }
 
-  void save_to(std::filesystem::path) const;
+  void save_to(const std::filesystem::path &) const;
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(State, map, eff, store, value, tasks);

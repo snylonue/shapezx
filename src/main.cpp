@@ -6,11 +6,12 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <fstream>
+#include <filesystem>
 #include <gdk/gdkkeysyms.h>
 #include <gdkmm/enums.h>
 #include <glib.h>
 #include <glibmm/refptr.h>
+#include <glibmm/signalproxy.h>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
 #include <gtkmm/box.h>
@@ -279,7 +280,7 @@ public:
 class MainGame final : public Gtk::Window {
 protected:
   shapezx::State state;
-  shapezx::Global global_state;
+  std::reference_wrapper<shapezx::Global> global_state_;
   UIState ui_state;
   sigc::signal<void(shapezx::BuildingType)> on_placing_machine_begin;
   Glib::RefPtr<Gtk::EventControllerKey> ev_key;
@@ -289,17 +290,22 @@ protected:
   Gtk::Box box;
   shapezx::ui::MachineSelector machines;
   UpgradeMachine upgrade_machine;
+  std::filesystem::path save_path;
 
 public:
-  explicit MainGame(shapezx::State &&state)
-      : state(std::move(state)), ev_key(Gtk::EventControllerKey::create()),
+  explicit MainGame(shapezx::State &&state, shapezx::Global &global_state,
+                    const std::filesystem::path &path)
+      : state(std::move(state)), global_state_(global_state),
+        ev_key(Gtk::EventControllerKey::create()),
         map(this->ui_state, this->state), box(Gtk::Orientation::VERTICAL),
-        upgrade_machine(this->state) {
+        upgrade_machine(this->state), save_path(path) {
+
+    std::cout << "6\n";
 
     this->conns.add(Glib::signal_timeout().connect(
         [this]() {
-          this->state.update([this]() { this->upgrade_machine.show(); },
-                             this->global_state);
+          this->state.update([this]() { this->upgrade_machine.set_visible(); },
+                             this->global_state_);
           return true;
         },
         50));
@@ -319,7 +325,10 @@ public:
     }));
 
     this->conns.add(this->machines.signal_save().connect(
-        [this]() { this->state.save_to("D:/dump.json"); }));
+        [this]() { this->state.save_to(this->save_path); }));
+
+    this->conns.add(this->signal_destroy().connect(
+        [this]() { this->state.save_to(this->save_path); }));
 
     this->ev_key->set_propagation_phase(Gtk::PropagationPhase::CAPTURE);
     this->conns.add(this->ev_key->signal_key_pressed().connect(
@@ -365,18 +374,68 @@ public:
   MainGame(MainGame &&) = delete;
 };
 
+class StartScreen final : public Gtk::Box {
+public:
+  Gtk::Button continue_game_;
+  Gtk::Button new_game_;
+  Gtk::Button exit_;
+
+  explicit StartScreen()
+      : Gtk::Box(Gtk::Orientation::VERTICAL), continue_game_("Continue"),
+        new_game_("New Game"), exit_("Exit") {
+    this->continue_game_.set_sensitive(false);
+
+    this->append(this->continue_game_);
+    this->append(this->new_game_);
+    this->append(this->exit_);
+  }
+
+  Glib::SignalProxy<void()> signal_new_game() {
+    return this->new_game_.signal_clicked();
+  }
+
+  Glib::SignalProxy<void()> signal_exit() {
+    return this->exit_.signal_clicked();
+  }
+};
+
+class App final : public Gtk::Window {
+public:
+  StartScreen start_screen_;
+  std::optional<MainGame> main_game_;
+  Connections conns;
+
+  shapezx::Global global_state;
+
+  explicit App(Glib::RefPtr<Gtk::Application> app) {
+    this->conns.add(
+        this->start_screen_.signal_new_game().connect([this, app]() {
+          auto const &p = this->global_state.create_save();
+          auto state = shapezx::State(this->global_state.max_height,
+                                      this->global_state.max_width);
+          auto &g =
+              this->main_game_.emplace(std::move(state), this->global_state, p);
+          this->conns.add(g.signal_destroy().connect([this, app]() {
+            this->start_screen_.set_visible();
+            this->main_game_.reset();
+            app->release();
+          }));
+          app->add_window(g);
+
+          g.present();
+          app->hold();
+          this->start_screen_.set_visible(false);
+        }));
+
+    this->conns.add(this->start_screen_.signal_exit().connect(
+        [this]() { this->destroy(); }));
+
+    this->set_child(this->start_screen_);
+  }
+};
+
 int main(int argc, char **argv) {
-  // auto state = shapezx::State(20, 30);
-  // state.add_task(shapezx::Task{.target_ = {{{shapezx::IRON_ORE, 10}}}});
-
-  std::ifstream f("D:/dump.json");
-  auto j = json::parse(f);
-  std::cout << 'y';
-  auto state = j.template get<shapezx::State>();
-
-  std::cout << 'x';
-
   auto app = Gtk::Application::create();
 
-  return app->make_window_and_run<MainGame>(argc, argv, std::move(state));
+  return app->make_window_and_run<App>(argc, argv, app);
 }

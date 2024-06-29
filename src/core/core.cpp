@@ -94,7 +94,7 @@ void from_json(const json &j, Chunk &p) {
   std::cout << "t3\n";
 }
 
-void State::save_to(std::filesystem::path p) const {
+void State::save_to(const std::filesystem::path &p) const {
   std::ofstream f(p);
   f << json(*this);
 }
