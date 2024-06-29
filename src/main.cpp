@@ -173,32 +173,33 @@ public:
     this->set_valign(Gtk::Align::FILL);
     this->set_halign(Gtk::Align::FILL);
 
-    auto place_machine = [&, width = game_state.map.width](
-                             std::vector<shapezx::vec::Vec2<>> v,
-                             shapezx::Building *ref) {
-      auto id = ref->info().id;
-      auto it = this->machines
-                    .insert(std::make_pair(
-                        id, shapezx::ui::Machine::create(
-                                ref->info().type, v[0], ref->info().direction,
-                                id, ui_state, this->machine_removed_)))
-                    .first;
+    auto place_machine =
+        [&, width = game_state.map.width](std::vector<shapezx::vec::Vec2<>> v,
+                                          shapezx::Building *ref) {
+          auto id = ref->info().id;
+          auto it =
+              this->machines
+                  .insert(std::make_pair(
+                      id, shapezx::ui::Machine::create(
+                              ref->info().type, v[0], ref->info().direction, id,
+                              ui_state, game_state, this->machine_removed_)))
+                  .first;
 
-      auto &machine = it->second;
+          auto &machine = it->second;
 
-      for (auto chk : v) {
-        this->remove(this->chunks[chk[0] * width + chk[1]]);
-      }
-      auto [w, h] = ref->size();
-      auto get = [](size_t i) {
-        return [=](const shapezx::vec::Vec2<> &v) { return v[i]; };
-      };
+          for (auto chk : v) {
+            this->remove(this->chunks[chk[0] * width + chk[1]]);
+          }
+          auto [w, h] = ref->size();
+          auto get = [](size_t i) {
+            return [=](const shapezx::vec::Vec2<> &v) { return v[i]; };
+          };
 
-      auto r = std::ranges::min(v | std::ranges::views::transform(get(0)));
-      auto c = std::ranges::min(v | std::ranges::views::transform(get(1)));
+          auto r = std::ranges::min(v | std::ranges::views::transform(get(0)));
+          auto c = std::ranges::min(v | std::ranges::views::transform(get(1)));
 
-      this->attach(*machine, c, r, w, h);
-    };
+          this->attach(*machine, c, r, w, h);
+        };
 
     for (auto const r :
          std::views::iota(std::size_t(0), game_state.map.height)) {
@@ -318,6 +319,9 @@ public:
           this->state.update([this]() { this->upgrade_machine.set_visible(); },
                              this->global_state_);
           std::cout << this->global_state_.get().value;
+          for (auto &[id, machine] : this->map.machines) {
+            machine->update();
+          }
           return true;
         },
         50));
@@ -555,6 +559,9 @@ public:
           this->global_state.last_played = this->global_state.saves.size() - 1;
           auto state = shapezx::State(this->global_state.max_height,
                                       this->global_state.max_width);
+          state.add_task({.target_ = {{{shapezx::IRON_ORE, 20}}}});
+          state.add_task({.target_ = {{{shapezx::GOLD, 30}}}});
+          state.add_task({.target_ = {{{shapezx::IRON, 50}}}});
 
           begin_game(std::move(state), p);
         }));

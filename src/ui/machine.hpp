@@ -1,16 +1,20 @@
 #ifndef SHAPEZX_UI_MACHINE
 #define SHAPEZX_UI_MACHINE
 
+#include "../core/core.hpp"
 #include "../core/machine.hpp"
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <gdkmm/pixbuf.h>
 #include <glibmm/refptr.h>
 #include <glibmm/signalproxy.h>
 #include <gtkmm/box.h>
 #include <gtkmm/button.h>
+#include <gtkmm/enums.h>
 #include <gtkmm/image.h>
 #include <gtkmm/label.h>
 #include <gtkmm/listbox.h>
@@ -20,6 +24,7 @@
 #include <gtkmm/window.h>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <sigc++/signal.h>
 
 #include <string>
@@ -124,7 +129,8 @@ class Machine : public Gtk::Button {
 public:
   static std::unique_ptr<Machine>
   create(BuildingType type, vec::Vec2<> pos, Direction d, std::uint32_t id,
-         UIState &ui_state, sigc::signal<void(std::uint32_t)> machine_removed);
+         UIState &ui_state, const shapezx::State &game_state,
+         sigc::signal<void(std::uint32_t)> machine_removed);
 
   BuildingType type_;
   vec::Vec2<> pos_;
@@ -168,20 +174,62 @@ public:
   sigc::signal<void(std::uint32_t)> signal_machine_removed() {
     return this->machine_removed_;
   }
+
+  virtual void update() {}
 };
 
-class TaskSelector final : public Gtk::Window {};
+class TaskSelector final : public Gtk::Window {
+public:
+  Gtk::Box box_;
+  std::vector<Gtk::Button> butns_;
+  std::reference_wrapper<const shapezx::State> game_state_;
+  Connections conns;
+
+  std::optional<std::size_t> selected;
+
+  explicit TaskSelector(const shapezx::State &game_state)
+      : box_(Gtk::Orientation::VERTICAL), game_state_(game_state) {
+    this->butns_.reserve(this->game_state_.get().tasks.size());
+    for (auto [i, task] :
+         this->game_state_.get().tasks | std::ranges::views::enumerate) {
+      std::string label = std::format("{} - ", i);
+      for (auto [item, num] : task.target_.items) {
+        label += std::format("{}: {}", item.name, num);
+      }
+      auto &butn = this->butns_.emplace_back(label);
+      conns.add(butn.signal_clicked().connect([this, i]() {
+        if (this->selected != i) {
+          this->selected = i;
+        } else {
+          this->selected = std::nullopt;
+        }
+        this->set_visible(false);
+      }));
+    }
+
+    for (auto &butn : this->butns_) {
+      this->box_.append(butn);
+    }
+
+    this->set_child(this->box_);
+  }
+};
 
 class TaskCenter final : public Machine {
 public:
-  Gtk::Window setting_;
+  TaskSelector setting_;
   Connections conns_;
+  Gtk::Label info_;
+
+  std::reference_wrapper<const shapezx::State> game_state_;
 
   explicit TaskCenter(Glib::RefPtr<Gdk::Pixbuf> icon, vec::Vec2<> pos,
                       Direction d, std::uint32_t id, UIState &ui_state,
+                      const shapezx::State &game_state,
                       sigc::signal<void(std::uint32_t)> machine_removed)
       : Machine(BuildingType::TaskCenter, icon, pos, d, id, ui_state,
-                machine_removed) {
+                machine_removed),
+        setting_(game_state), game_state_(game_state) {
     this->conns_.add(this->setting_.signal_show().connect(
         [this]() { this->ui_state_.get().lock_map(); }));
     this->conns_.add(this->setting_.signal_destroy().connect(
@@ -193,7 +241,29 @@ public:
       this->machine_removed_.emit(this->id_);
       this->ui_state_.get().machine_removing = false;
     } else {
-      this->setting_.show();
+      this->setting_.set_visible();
+    }
+  }
+
+  void update() override {
+    if (this->setting_.selected) {
+      auto selected = *this->setting_.selected;
+      std::string s;
+      auto &task = this->game_state_.get().tasks[selected];
+      if (task.completed_) {
+        s = "Completed";
+      } else {
+        auto &store = this->game_state_.get().store;
+        for (auto &[item, num] : task.target_.items) {
+          s += std::format("{}: {} / {}\n", item.name, store.get(item), num);
+        }
+      }
+      this->info_.set_text(s);
+      this->unset_child();
+      this->set_child(this->info_);
+    } else {
+      this->unset_child();
+      this->set_child(this->icon_);
     }
   }
 };

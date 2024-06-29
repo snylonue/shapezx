@@ -4,7 +4,7 @@
 namespace shapezx::ui {
 std::unique_ptr<Machine>
 Machine::create(BuildingType type, vec::Vec2<> pos, Direction d,
-                std::uint32_t id, UIState &ui_state,
+                std::uint32_t id, UIState &ui_state, const shapezx::State &game_state,
                 sigc::signal<void(std::uint32_t)> machine_removed) {
   switch (type) {
   case BuildingType::Miner:
@@ -26,7 +26,7 @@ Machine::create(BuildingType type, vec::Vec2<> pos, Direction d,
   case BuildingType::TaskCenter:
     return std::make_unique<TaskCenter>(
         Gdk::Pixbuf::create_from_file("./assets/task_center.png"), pos, d, id,
-        ui_state, machine_removed);
+        ui_state, game_state, machine_removed);
   default:
     std::unreachable();
   }

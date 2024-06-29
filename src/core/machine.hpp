@@ -126,7 +126,7 @@ struct Buffer {
     return ret;
   }
 
-  size_t get(Item it) const try {
+  size_t get(const Item& it) const try {
     return this->items.at(it);
   } catch (const std::out_of_range &) {
     return 0;
