@@ -175,10 +175,26 @@ struct MapAccessor {
   }
 };
 
+struct Price {
+  uint32_t center_ = 0;
+  uint32_t map_ = 0;
+  uint32_t value_ = 0;
+
+  uint64_t center() { return 50 * (1 << this->center_); }
+  uint64_t map() { return 50 * (1 << this->map_); }
+  uint64_t value() { return 50 * (1 << this->value_); }
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Price, center_, map_, value_)
+
 struct Global {
   static Global load(const std::string &p) noexcept;
 
   std::uint32_t value = 0;
+  std::uint32_t value_factor = 1;
+  vec::Vec2<> center_size = {2, 2};
+
+  Price price;
 
   optional<size_t> last_played;
 
@@ -198,6 +214,9 @@ struct Global {
 inline void to_json(nlohmann::json &nlohmann_json_j,
                     const Global &nlohmann_json_t) {
   nlohmann_json_j["value"] = nlohmann_json_t.value;
+  nlohmann_json_j["value_factor"] = nlohmann_json_t.value_factor;
+  nlohmann_json_j["center_size"] = nlohmann_json_t.center_size;
+  nlohmann_json_j["price"] = nlohmann_json_t.price;
   if (nlohmann_json_t.last_played) {
     nlohmann_json_j["last_played"] = *nlohmann_json_t.last_played;
   } else {
@@ -210,6 +229,9 @@ inline void to_json(nlohmann::json &nlohmann_json_j,
 inline void from_json(const nlohmann ::json &nlohmann_json_j,
                       Global &nlohmann_json_t) {
   nlohmann_json_j.at("value").get_to(nlohmann_json_t.value);
+  nlohmann_json_j.at("value_factor").get_to(nlohmann_json_t.value_factor);
+  nlohmann_json_j.at("center_size").get_to(nlohmann_json_t.center_size);
+  nlohmann_json_j.at("price").get_to(nlohmann_json_t.price);
   try {
     size_t last;
     nlohmann_json_j.at("last_played").get_to(last);
@@ -256,7 +278,7 @@ struct State {
   void update(std::function<void()> on_task_complete, Global &global_state) {
     // std::cout << "updating\n";
     this->map.update(*this);
-    global_state.value += this->value;
+    global_state.value += this->value * global_state.value_factor;
     this->value = 0;
 
     for (auto &task : this->tasks) {

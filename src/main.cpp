@@ -10,6 +10,7 @@
 #include <gdk/gdkkeysyms.h>
 #include <gdkmm/enums.h>
 #include <glib.h>
+#include <glibmm/main.h>
 #include <glibmm/refptr.h>
 #include <glibmm/signalproxy.h>
 #include <gtkmm.h>
@@ -295,6 +296,7 @@ protected:
   UIState ui_state;
   sigc::signal<void(shapezx::BuildingType)> on_placing_machine_begin;
   Glib::RefPtr<Gtk::EventControllerKey> ev_key;
+  Glib::SignalTimeout timer;
   Map map;
   Gtk::ScrolledWindow map_window;
   Connections conns;
@@ -308,15 +310,14 @@ public:
                     const std::string &path)
       : state(std::move(state)), global_state_(global_state),
         ev_key(Gtk::EventControllerKey::create()),
-        map(this->ui_state, this->state), box(Gtk::Orientation::VERTICAL),
-        upgrade_machine(this->state), save_path(path) {
-
-    std::cout << "6\n";
-
-    this->conns.add(Glib::signal_timeout().connect(
+        timer(Glib::signal_timeout()), map(this->ui_state, this->state),
+        box(Gtk::Orientation::VERTICAL), upgrade_machine(this->state),
+        save_path(path) {
+    this->conns.add(this->signal_update().connect(
         [this]() {
           this->state.update([this]() { this->upgrade_machine.set_visible(); },
                              this->global_state_);
+          std::cout << this->global_state_.get().value;
           return true;
         },
         50));
@@ -381,8 +382,25 @@ public:
     this->set_child(this->box);
   }
 
+  Glib::SignalTimeout signal_update() { return this->timer; }
+
   MainGame(const MainGame &) = delete;
   MainGame(MainGame &&) = delete;
+};
+
+template <typename T> class Value final : public Gtk::Label {
+public:
+  T val_;
+  explicit Value(T val) : val_(val) {
+    this->set_text(std::format("{}", this->val_));
+  }
+
+  void set_value(T val) {
+    if (val != this->val_) {
+      this->val_ = val;
+      this->set_text(std::format("{}", val));
+    }
+  }
 };
 
 class StartScreen final : public Gtk::Box {
@@ -391,13 +409,15 @@ public:
   Gtk::Button new_game_;
   Gtk::Button open_store_;
   Gtk::Button exit_;
+  Value<std::uint32_t> coins_;
 
   std::reference_wrapper<shapezx::Global> global_state_;
+  bool playing = false;
 
   explicit StartScreen(shapezx::Global &global_state)
       : Gtk::Box(Gtk::Orientation::VERTICAL), continue_game_("Continue"),
         new_game_("New Game"), open_store_("Open Store"), exit_("Exit"),
-        global_state_(global_state) {
+        coins_(global_state.value), global_state_(global_state) {
 
     this->update();
 
@@ -405,11 +425,14 @@ public:
     this->append(this->new_game_);
     this->append(this->open_store_);
     this->append(this->exit_);
+    this->append(this->coins_);
   }
 
   void update() {
     this->continue_game_.set_sensitive(
-        this->global_state_.get().last_played.has_value());
+        !this->playing && this->global_state_.get().last_played.has_value());
+    this->new_game_.set_sensitive(!this->playing);
+    this->coins_.set_value(this->global_state_.get().value);
   }
 
   Glib::SignalProxy<void()> signal_continue_game() {
@@ -435,14 +458,57 @@ public:
   Gtk::Button center_;
   Gtk::Button map_;
   Gtk::Button value_;
+  Connections conns;
 
-  Store()
-      : box_(Gtk::Orientation::VERTICAL), center_("Enlarge Task Center"),
-        map_("Increase Map size"), value_("Increase value of ores") {
+  std::reference_wrapper<shapezx::Global> global_state_;
+
+  Store(shapezx::Global &global_state)
+      : box_(Gtk::Orientation::VERTICAL), global_state_(global_state) {
+    this->update();
+
+    this->conns.add(this->center_.signal_clicked().connect([this]() {
+      if (auto &s = this->global_state_.get(); s.value >= s.price.center()) {
+        s.value -= s.price.center();
+        s.price.center_ += 1;
+        s.center_size += {1, 1};
+        this->update();
+      }
+    }));
+
+    this->conns.add(this->map_.signal_clicked().connect([this]() {
+      if (auto &s = this->global_state_.get(); s.value >= s.price.map()) {
+        s.value -= s.price.map();
+        s.price.map_ += 1;
+        s.max_height += 10;
+        s.max_width += 10;
+        this->update();
+      }
+    }));
+
+    this->conns.add(this->value_.signal_clicked().connect([this]() {
+      if (auto &s = this->global_state_.get(); s.value >= s.price.value()) {
+        s.value -= s.price.value();
+        s.price.value_ += 1;
+        s.value_factor += 1;
+        this->update();
+      }
+    }));
+
     this->box_.append(this->center_);
     this->box_.append(this->map_);
     this->box_.append(this->value_);
     this->set_child(this->box_);
+  }
+
+  void update() {
+    this->center_.set_label(
+        std::format("Enlarge Task Center ({} coins)",
+                    this->global_state_.get().price.center()));
+    this->map_.set_label(std::format("Increase Map size ({} coins)",
+                                     this->global_state_.get().price.map()));
+    this->value_.set_label(
+        std::format("Increase value of ores ({} coins)",
+                    this->global_state_.get().price.value()));
   }
 };
 
@@ -457,18 +523,19 @@ public:
 
   explicit App()
       : global_state(shapezx::Global::load("./global_state.json")),
-        start_screen_(this->global_state) {
+        start_screen_(this->global_state), store_(this->global_state) {
     auto begin_game = [this](shapezx::State &&state, const std::string &p) {
       auto &g =
           this->main_game_.emplace(std::move(state), this->global_state, p);
       this->conns.add(g.signal_destroy().connect([this]() {
-        this->start_screen_.set_visible();
+        this->start_screen_.playing = false;
         this->main_game_.reset();
         this->start_screen_.update();
       }));
 
       g.present();
-      this->start_screen_.set_visible(false);
+      this->start_screen_.playing = true;
+      this->start_screen_.update();
     };
 
     this->conns.add(this->start_screen_.signal_continue_game().connect(
@@ -502,6 +569,13 @@ public:
       std::cout << "1\n";
       this->global_state.save_to("./global_state.json");
     }));
+
+    this->conns.add(Glib::signal_timeout().connect(
+        [this]() {
+          this->start_screen_.update();
+          return true;
+        },
+        1000));
 
     this->set_child(this->start_screen_);
   }

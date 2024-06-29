@@ -31,7 +31,7 @@ concept Scalar = Arithmetic<K> && requires(K c, T x) {
 // clang-format on
 
 template <Arithmetic T = std::size_t> struct Vec2 {
-  std::array<T, 2> data {0, 0};
+  std::array<T, 2> data{0, 0};
 
   Vec2() = default;
   Vec2(const T a1, const T a2) : data({a1, a2}) {}
@@ -47,12 +47,22 @@ template <Arithmetic T = std::size_t> struct Vec2 {
     return {this->data[0] + rhs.data[0], this->data[1] + rhs.data[1]};
   }
 
+  Vec2<T> &operator+=(const Vec2<T> &rhs) {
+    *this = *this + rhs;
+    return *this;
+  };
+
   template <typename U = T>
   Vec2<T> operator-(const Vec2<U> &rhs) const
     requires Arithmetic<T, U>
   {
     return {this->data[0] - rhs.data[0], this->data[1] - rhs.data[1]};
   }
+
+  Vec2<T> &operator-=(const Vec2<T> &rhs) {
+    *this = *this - rhs;
+    return *this;
+  };
 
   template <typename K = T>
   Vec2 operator*(const K &rhs) const
