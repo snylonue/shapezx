@@ -80,12 +80,15 @@ public:
   std::reference_wrapper<UIState> ui_state;
   std::reference_wrapper<IdGenerator> id_;
   sig_machine_placed machine_placed;
+  sigc::signal<void(std::uint32_t)> machine_removed_;
 
   Gtk::Image ore_icon;
 
   explicit Chunk(shapezx::MapAccessor current_chunk_, UIState &ui_state,
-                 IdGenerator &id)
-      : map_accessor(current_chunk_), ui_state(ui_state), id_(id) {
+                 IdGenerator &id,
+                 sigc::signal<void(std::uint32_t)> machine_removed)
+      : map_accessor(current_chunk_), ui_state(ui_state), id_(id),
+        machine_removed_(machine_removed) {
     this->reset_label();
     this->set_expand(true);
     this->set_halign(Gtk::Align::FILL);
@@ -125,6 +128,15 @@ public:
       }
 
       auto ref = machine.get();
+
+      for (auto [r, c] : shapezx::rect_iter(ref->relative_rect())) {
+        auto [chk, acc] = this->map_accessor.get_chunk_and_accessor({r, c});
+        if (chk.building) {
+          auto &b = *chk.building;
+          this->machine_removed_.emit(b->info().id);
+        }
+      }
+
       auto modified = this->map_accessor.add_machine(std::move(machine));
       this->machine_placed.emit(modified, ref);
 
@@ -158,6 +170,7 @@ public:
   std::vector<Chunk> chunks;
   std::unordered_map<std::uint32_t, std::unique_ptr<shapezx::ui::Machine>>
       machines;
+  sigc::signal<void(std::uint32_t)> machine_removed_;
   Connections conns;
   IdGenerator id_;
 
@@ -172,26 +185,12 @@ public:
       auto id = ref->info().id;
       auto it = this->machines
                     .insert(std::make_pair(
-                        id, shapezx::ui::Machine::create(ref->info().type, v[0],
-                                                         ref->info().direction,
-                                                         id, ui_state)))
+                        id, shapezx::ui::Machine::create(
+                                ref->info().type, v[0], ref->info().direction,
+                                id, ui_state, this->machine_removed_)))
                     .first;
 
       auto &machine = it->second;
-
-      conns.add(machine->signal_machine_removed().connect(
-          [&game_state, width = game_state.map.width, this](std::uint32_t id) {
-            auto &m = this->machines.at(id);
-            auto pos = m->pos_;
-            auto acc = game_state.create_accessor_at(pos);
-            this->remove(*m);
-            auto res = acc.remove_machine();
-
-            for (auto chk : res) {
-              this->attach(this->chunks[chk[0] * width + chk[1]], chk[1],
-                           chk[0]);
-            }
-          }));
 
       for (auto chk : v) {
         this->remove(this->chunks[chk[0] * width + chk[1]]);
@@ -212,7 +211,8 @@ public:
       for (auto const c :
            std::views::iota(std::size_t(0), game_state.map.width)) {
         auto &chunk = this->chunks.emplace_back(
-            game_state.create_accessor_at({r, c}), ui_state, this->id_);
+            game_state.create_accessor_at({r, c}), ui_state, this->id_,
+            this->machine_removed_);
         conns.add(chunk.signal_machine_placed().connect(place_machine));
         this->attach(chunk, c, r);
       }
@@ -238,6 +238,19 @@ public:
         }
       }
     }
+
+    conns.add(this->machine_removed_.connect(
+        [&game_state, width = game_state.map.width, this](std::uint32_t id) {
+          auto &m = this->machines.at(id);
+          auto pos = m->pos_;
+          auto acc = game_state.create_accessor_at(pos);
+          this->remove(*m);
+          auto res = acc.remove_machine();
+
+          for (auto chk : res) {
+            this->attach(this->chunks[chk[0] * width + chk[1]], chk[1], chk[0]);
+          }
+        }));
   }
 };
 
@@ -475,14 +488,15 @@ public:
           begin_game(std::move(state), p);
         }));
 
-    this->conns.add(this->start_screen_.signal_new_game().connect([this, begin_game]() {
-      auto const &p = this->global_state.create_save();
-      this->global_state.last_played = this->global_state.saves.size() - 1;
-      auto state = shapezx::State(this->global_state.max_height,
-                                  this->global_state.max_width);
+    this->conns.add(
+        this->start_screen_.signal_new_game().connect([this, begin_game]() {
+          auto const &p = this->global_state.create_save();
+          this->global_state.last_played = this->global_state.saves.size() - 1;
+          auto state = shapezx::State(this->global_state.max_height,
+                                      this->global_state.max_width);
 
-      begin_game(std::move(state), p);
-    }));
+          begin_game(std::move(state), p);
+        }));
 
     this->conns.add(this->start_screen_.signal_open_store().connect(
         [this]() { this->store_.set_visible(); }));

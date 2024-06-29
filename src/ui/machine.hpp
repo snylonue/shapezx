@@ -77,7 +77,7 @@ protected:
   Gtk::Button remove;
   Gtk::Image remove_icon;
   sigc::signal<void(BuildingType)> sig_machine_selected;
-  
+
   Gtk::Button save;
 
 public:
@@ -122,21 +122,23 @@ class TaskCenter;
 
 class Machine : public Gtk::Button {
 public:
-  static std::unique_ptr<Machine> create(BuildingType type, vec::Vec2<> pos,
-                                         Direction d, std::uint32_t id,
-                                         UIState &ui_state);
+  static std::unique_ptr<Machine>
+  create(BuildingType type, vec::Vec2<> pos, Direction d, std::uint32_t id,
+         UIState &ui_state, sigc::signal<void(std::uint32_t)> machine_removed);
 
   BuildingType type_;
   vec::Vec2<> pos_;
   std::uint32_t id_;
   Gtk::Image icon_;
   std::reference_wrapper<UIState> ui_state_;
-  sigc::signal<void(std::uint32_t)> machine_removed;
+  sigc::signal<void(std::uint32_t)> machine_removed_;
 
   explicit Machine(BuildingType type, Glib::RefPtr<Gdk::Pixbuf> icon,
                    vec::Vec2<> pos, Direction d, std::uint32_t id,
-                   UIState &ui_state)
-      : type_(type), pos_(pos), id_(id), ui_state_(ui_state) {
+                   UIState &ui_state,
+                   sigc::signal<void(std::uint32_t)> machine_removed)
+      : type_(type), pos_(pos), id_(id), ui_state_(ui_state),
+        machine_removed_(machine_removed) {
     switch (d) {
     case Direction::Right:
       this->icon_.set(icon->rotate_simple(Gdk::Pixbuf::Rotation::CLOCKWISE));
@@ -158,19 +160,17 @@ public:
 
   void on_clicked() override {
     if (this->ui_state_.get().machine_removing) {
-      this->machine_removed.emit(this->id_);
+      this->machine_removed_.emit(this->id_);
       this->ui_state_.get().machine_removing = false;
     }
   }
 
   sigc::signal<void(std::uint32_t)> signal_machine_removed() {
-    return this->machine_removed;
+    return this->machine_removed_;
   }
 };
 
-class TaskSelector final : public Gtk::Window {
-
-};
+class TaskSelector final : public Gtk::Window {};
 
 class TaskCenter final : public Machine {
 public:
@@ -178,8 +178,10 @@ public:
   Connections conns_;
 
   explicit TaskCenter(Glib::RefPtr<Gdk::Pixbuf> icon, vec::Vec2<> pos,
-                      Direction d, std::uint32_t id, UIState &ui_state)
-      : Machine(BuildingType::TaskCenter, icon, pos, d, id, ui_state) {
+                      Direction d, std::uint32_t id, UIState &ui_state,
+                      sigc::signal<void(std::uint32_t)> machine_removed)
+      : Machine(BuildingType::TaskCenter, icon, pos, d, id, ui_state,
+                machine_removed) {
     this->conns_.add(this->setting_.signal_show().connect(
         [this]() { this->ui_state_.get().lock_map(); }));
     this->conns_.add(this->setting_.signal_destroy().connect(
@@ -188,7 +190,7 @@ public:
 
   void on_clicked() override {
     if (this->ui_state_.get().machine_removing) {
-      this->machine_removed.emit(this->id_);
+      this->machine_removed_.emit(this->id_);
       this->ui_state_.get().machine_removing = false;
     } else {
       this->setting_.show();
